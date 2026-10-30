@@ -1,14 +1,15 @@
 // ==UserScript==
 // @name         Liên kết sự cố - Duy tu SmartHCM
 // @namespace    lavipco.cskvtt
-// @version      1.0.0
+// @version      1.0.1
 // @description  Tự động ghép & liên kết sự cố cho công việc duy tu trên smarthcm.city (bản rule-based, không cần AI). Ghép theo số trụ + vị trí + loại việc, lọc dòng lệch, duyệt bảng rồi lưu.
 // @author       CSKVTT - LAVIPCO
-// @match        https://www.smarthcm.city/Maintenance/TaskListNew*
+// @match        https://smarthcm.city/*
+// @match        https://*.smarthcm.city/*
+// @match        http://smarthcm.city/*
+// @match        http://*.smarthcm.city/*
 // @run-at       document-idle
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/neo-era/lien-ket-su-co-smarthcm/main/lien-ket-su-co-smarthcm.user.js
-// @downloadURL  https://raw.githubusercontent.com/neo-era/lien-ket-su-co-smarthcm/main/lien-ket-su-co-smarthcm.user.js
 // ==/UserScript==
 
 /*

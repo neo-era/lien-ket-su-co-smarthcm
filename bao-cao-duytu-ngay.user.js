@@ -1,10 +1,13 @@
 // ==UserScript==
 // @name         Báo cáo duy tu trong ngày - SmartHCM
 // @namespace    lavipco.cskvtt
-// @version      1.0.0
+// @version      1.0.1
 // @description  Tổng hợp kết quả công tác duy tu toàn KVTT theo ngày (ghi nhận) và xuất ra file Word (Mẫu hành chính). Chạy trên smarthcm.city.
 // @author       CSKVTT - LAVIPCO
-// @match        https://www.smarthcm.city/Maintenance/TaskListNew*
+// @match        https://smarthcm.city/*
+// @match        https://*.smarthcm.city/*
+// @match        http://smarthcm.city/*
+// @match        http://*.smarthcm.city/*
 // @run-at       document-idle
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/neo-era/lien-ket-su-co-smarthcm/main/bao-cao-duytu-ngay.user.js
