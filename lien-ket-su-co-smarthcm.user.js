@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Liên kết sự cố - Duy tu SmartHCM
 // @namespace    lavipco.cskvtt
-// @version      1.1.0
-// @description  Tự động ghép & liên kết sự cố cho công việc duy tu trên smarthcm.city (rule-based + TỰ HỌC từ chỉnh sửa của anh). Ghép theo số trụ + vị trí + loại việc, lọc dòng lệch, học khi anh sửa, duyệt bảng rồi lưu.
+// @version      1.2.0
+// @description  Tự động ghép & liên kết sự cố cho công việc duy tu trên smarthcm.city (rule-based + TỰ HỌC + khớp thiết bị cấp tủ). Ghép theo số trụ + vị trí + loại việc, khớp thiết bị cấp tủ (RCCB/MCB/Contactor/tủ ĐK) không số trụ, lọc dòng lệch, học khi anh sửa, duyệt bảng rồi lưu.
 // @author       CSKVTT - LAVIPCO
 // @match        https://smarthcm.city/*
 // @match        https://*.smarthcm.city/*
@@ -175,6 +175,11 @@
   const wm = (w, c) => { const k = workKey(w); if (!k) return 0; const n = ' ' + norm(c) + ' '; return KW[k].some(x => n.includes(' ' + x)) ? 1 : 0; };
   const dt = x => x instanceof Date ? x : (x ? new Date(x) : null);
 
+  // ---------- Thiết bị cấp tủ (không ghi số trụ): khớp theo loại thiết bị trong cùng tủ ----------
+  const MAXDAYS_EQ = 120;
+  const EQ = { rccb: /rccb|rcbo|elcb/, contactor: /contactor|khoi dong tu/, mcbx: /\bmcb\b/, tudk: /tu dieu khien|lap trinh|bo dieu khien|timer/ };
+  const eqg = s => { s = norm(s); for (const k in EQ) if (EQ[k].test(s)) return k; return null; };
+
   // ---------- Bộ lọc dòng lệch cố định (theo các kiểu đã gặp) ----------
   function lechReason(o) {
     const w = o.work || '', d = o.desc || '', c = o.incContent || '';
@@ -218,14 +223,22 @@
           else if (!tp.length && inter >= 2) lvl = 'B';
           if (lvl) cands.push({ i, lvl, inter, w: wm(work, i.Content), days: Math.abs(days) });
         }
+        // Thiết bị cấp tủ: công việc không có số trụ + cùng loại thiết bị với sự cố trong tủ
+        const eg = eqg(work + ' ' + (r.Description || ''));
+        if (eg && !tp.length) {
+          const eqc = (inc[r.CabinetId] || []).filter(i => i && i.Id && eqg(i.Content) === eg)
+            .map(i => ({ i, days: td && i.CreatedAt ? Math.abs((td - dt(i.CreatedAt)) / 864e5) : 999 }))
+            .filter(x => x.days <= MAXDAYS_EQ).sort((a, b) => a.days - b.days);
+          if (eqc.length) cands.unshift({ i: eqc[0].i, lvl: eqc.length === 1 ? 'A' : 'B', inter: 9, w: 1, days: eqc[0].days, eq: true });
+        }
         cands.sort((a, b) => a.lvl.localeCompare(b.lvl) || b.w - a.w || a.days - b.days || b.inter - a.inter);
         const c = cands[0]; let lvl = c ? c.lvl : '-';
-        if (c && lvl === 'A' && c.w === 0 && cands.some(x => x.lvl === 'A' && x.w === 0 && norm(x.i.Content) !== norm(c.i.Content))) lvl = 'B';
+        if (c && !c.eq && lvl === 'A' && c.w === 0 && cands.some(x => x.lvl === 'A' && x.w === 0 && norm(x.i.Content) !== norm(c.i.Content))) lvl = 'B';
         const o = {
           id: r.Id, cab: (r.Cabinet && r.Cabinet.BoxName || '').trim(), work,
           desc: (r.Description || '').trim(), date: td ? td.toLocaleDateString('vi-VN') : '', lvl, w: c ? c.w : undefined,
           incId: c ? c.i.Id : undefined, incContent: (c ? c.i.Content : '').trim().replace(/\s+/g, ' '),
-          incDate: c ? dt(c.i.CreatedAt).toLocaleDateString('vi-VN') : ''
+          incDate: c ? dt(c.i.CreatedAt).toLocaleDateString('vi-VN') : '', _eq: !!(c && c.eq)
         };
         o.lech = o.lvl === 'A' ? lechReason(o) : '';
         if (o.incId) LRN.applyLearn(o, STORE); // gắn o._learn + o._learnKey
@@ -335,6 +348,7 @@
       else if (o._learn === 'dung') note = `<div class="learnY">📚 đã học: anh từng giữ</div>`;
       else if (o._learn === 'conflict') note = `<div class="mini" style="color:#b8860b">📚 đã học: mâu thuẫn — xem lại</div>`;
       else if (o.lech) note = `<div class="mini" style="color:#b8860b">⚠ ${esc(o.lech)}</div>`;
+      if (o._eq) note += `<div class="mini" style="color:#0d6efd">⚙ thiết bị cấp tủ (khớp theo loại thiết bị)</div>`;
       html.push(`<tr class="${cls}">
         <td><input type="checkbox" data-i="${i}" data-def="${def ? 1 : 0}" ${def ? 'checked' : ''}></td>
         <td>${tag}</td>

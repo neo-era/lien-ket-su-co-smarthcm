@@ -69,6 +69,16 @@ Công cụ tự đánh dấu “lệch” các kiểu ghép sai thường gặp:
 > lọt vào nhóm A — hãy liếc qua bảng trước khi lưu. Từ **v1.1.0**, công cụ tự học từ chỉnh sửa của bạn (xem mục 6),
 > nên mỗi kiểu lệch mới chỉ cần sửa tay **một lần**.
 
+### Khớp thiết bị cấp tủ (v1.2.0)
+
+Sự cố **cấp tủ** (RCCB/RCBO/ELCB, MCB, Contactor, tủ điều khiển/bộ lập trình) thường **không ghi số trụ** ở cả công việc
+lẫn sự cố, nên luật số trụ bỏ sót. Từ v1.2.0, khi mô tả công việc **không có số trụ**, công cụ ghép theo **loại thiết bị
+trong cùng tủ** (sự cố trong vòng 120 ngày):
+
+- Tủ có **đúng 1** sự cố cùng loại thiết bị → nhóm **A**, tick sẵn, ghi chú *“⚙ thiết bị cấp tủ”*.
+- Tủ có **nhiều** sự cố cùng loại → nhóm **B** (không tick), để bạn tự chọn.
+- Mô tả có số trụ → luật cấp tủ không can thiệp.
+
 ## 6. Tự học từ chỉnh sửa (v1.1.0)
 
 Công cụ **ghi nhớ cách bạn sửa** và tự áp dụng cho lần sau — không cần sửa code.
