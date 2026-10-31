@@ -66,15 +66,30 @@ Công cụ tự đánh dấu “lệch” các kiểu ghép sai thường gặp:
 | Tháo băng rôn ↔ đèn tắt | — |
 
 > **Hạn chế:** bản rule-based **không đọc hiểu ngữ nghĩa**. Dòng lệch kiểu **mới** (chưa có trong bảng trên) có thể vẫn
-> lọt vào nhóm A — hãy liếc qua bảng trước khi lưu. Gặp kiểu lệch mới, thêm vào hàm `lechReason()` trong file script.
+> lọt vào nhóm A — hãy liếc qua bảng trước khi lưu. Từ **v1.1.0**, công cụ tự học từ chỉnh sửa của bạn (xem mục 6),
+> nên mỗi kiểu lệch mới chỉ cần sửa tay **một lần**.
 
-## 6. Khắc phục sự cố
+## 6. Tự học từ chỉnh sửa (v1.1.0)
+
+Công cụ **ghi nhớ cách bạn sửa** và tự áp dụng cho lần sau — không cần sửa code.
+
+- Mỗi khi bấm **“Lưu”**, công cụ so **đề xuất ban đầu** với **tick cuối cùng** của bạn:
+  - **Bỏ tick** một dòng công cụ đề xuất → học *“cặp này **sai**”*.
+  - **Tick** một dòng công cụ không đề xuất → học *“cặp này **đúng**”*.
+- Học theo **đặc trưng khái quát**: *loại việc × loại sự cố × quan hệ vị trí* (cùng/khác đường, khác Lô, hẻm↔cầu),
+  **không** theo mã công việc/sự cố (vì mã đổi mỗi đợt). Nhờ vậy sửa **một lần** áp cho **mọi trụ/quận** tương tự.
+- Lần ghép sau, dòng trùng đặc trưng đã học sẽ **tự bỏ/giữ tick** kèm ghi chú *“📚 đã học…”*.
+  Công cụ **không bao giờ tự lưu** — bạn vẫn duyệt bảng rồi mới bấm Lưu. Cặp vừa bị bỏ vừa được giữ → báo *mâu thuẫn*, không tự quyết.
+- Nút **“📚 Đã học (n)”** mở bảng quản lý: xem/xóa từng luật, **Xuất / Nhập JSON** để sao lưu hoặc chuyển sang máy khác.
+- Bộ nhớ học lưu trên **máy này** (localStorage của trình duyệt). Xóa dữ liệu duyệt web sẽ mất — hãy **Xuất JSON** để sao lưu.
+
+## 7. Khắc phục sự cố
 
 - **Không thấy panel:** kiểm tra đúng trang `/Maintenance/TaskListNew`, và Tampermonkey đang bật script.
 - **Bấm Ghép thử báo lỗi:** trang có thể đổi tên hàm nội bộ. Mở Console (F12) chạy
   `Object.keys(window).filter(k => /incident|link/i.test(k))` để tìm lại, rồi cập nhật script.
 - **Số liệu quận sai:** chọn lại đúng quận ở cột trái và chờ lưới nạp xong trước khi bấm Ghép thử.
 
-## 7. Giấy phép
+## 8. Giấy phép
 
 Dùng nội bộ. Xem [LICENSE](LICENSE).
