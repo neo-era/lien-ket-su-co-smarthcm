@@ -1,5 +1,5 @@
 const fs = require('fs');
-const VER = '1.0.0';
+const VER = '1.0.1';
 const RAW = 'https://raw.githubusercontent.com/neo-era/lien-ket-su-co-smarthcm/main/kiem-tra-mo-ta-anh.user.js';
 const head = `// ==UserScript==
 // @name         Kiểm tra mô tả & ảnh duy tu - SmartHCM

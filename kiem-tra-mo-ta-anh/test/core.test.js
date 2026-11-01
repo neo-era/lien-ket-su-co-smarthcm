@@ -131,6 +131,10 @@ ok(ex.TONG.length > 5, 'có tổng hợp');
 eq(C.slug('Quận Bình Thạnh'), 'QuanBinhThanh', 'slug tên file');
 
 
+// ---------- đồng bộ skill v1.1 ----------
+ok(C.buildChecker([])('Thay bóng đường cach mang thang tam').issues.some(i => /Cách Mạng Tháng Tám/.test(i.text)), 'cach mang thang tam → Cách Mạng Tháng Tám');
+eq(C.buildChecker([{ Cabinet: { Road: 'X', Ward: 'CẦU KIỆU' } }])('Thay bóng phường Cầu Kiệu').issues, [], 'phường in hoa toàn bộ "CẦU KIỆU" không làm báo nhầm');
+ok(C.buildChecker([])('Sơn trụ đường Hai Ba Trung').issues.some(i => /Hai Bà Trưng/.test(i.text)), 'Hai Bà Trưng có trong từ điển');
 // ---------- hồi quy sau review độc lập ----------
 { const L = C.parseLearn('{"rules":{"k":{"pos":"<img src=x onerror=alert(1)>","neg":2}},"de":{"x":null},"add":[1]}');
   eq(L.rules.k.pos, 0, 'pos không phải số → 0'); eq(L.rules.k.neg, 2, 'neg giữ số'); eq(Object.keys(L.de).length, 0, 'de sai cấu trúc bị bỏ');

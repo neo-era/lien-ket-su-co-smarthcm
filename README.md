@@ -110,7 +110,7 @@ Công cụ **ghi nhớ cách bạn sửa** và tự áp dụng cho lần sau —
 3. Công cụ tự lấy dữ liệu 8 quận, lọc theo ngày ghi nhận, tải `BaoCao-DuyTu-KVTT-YYYYMMDD.doc`:
    bảng tổng theo quận → mỗi quận có bảng hạng mục + danh sách chi tiết → dòng ký Giám đốc CSKVTT.
 
-## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.0.0)
+## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.0.1)
 
 ![Bảng chính tả](docs/kiemtra-bang.png)
 

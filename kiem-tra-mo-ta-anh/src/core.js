@@ -79,7 +79,7 @@ var KTCORE = (function () {
   function tn(s) { return s.normalize('NFC').toLowerCase().replace(/òa|óa|ỏa|õa|ọa|òe|óe|ỏe|õe|ọe|ùy|úy|ủy|ũy|ụy/g, function (m) { return TONE[m]; }); }
   var GEN = new Set('công viên khu đường hẻm cầu chợ nhà bến vòng xoay phường quận xã'.split(' '));
   // TỪ ĐIỂN TÊN CHUẨN — ưu tiên hơn dữ liệu tủ (dữ liệu tủ có chỗ sai, vd "Mạc Đỉnh Chi").
-  var EXTRA = ['Lê Duẩn', 'Lê Lợi', 'Lê Lai', 'Mạc Đĩnh Chi', 'Nam Kỳ Khởi Nghĩa', 'Điện Biên Phủ', 'Đỗ Quang Đẩu', 'Cô Giang', 'Cô Bắc', 'Đề Thám', 'Phạm Viết Chánh', 'Pasteur', 'Calmette', 'Hàm Nghi', 'Nguyễn Văn Cừ', 'Nguyễn Văn Thủ', 'Nguyễn Trãi', 'Nguyễn Thị Minh Khai', 'Trần Hưng Đạo', 'Nguyễn Công Trứ', 'Xô Viết Nghệ Tĩnh', 'Cách Mạng Tháng 8', 'Tân Định', 'Bến Thành', 'Bến Nghé', 'Sài Gòn', 'Cầu Ông Lãnh', 'Cầu Kho', 'Đa Kao', 'Xuân Hòa', 'Nhiêu Lộc', 'Gia Định', 'Nguyễn Cư Trinh', 'Phạm Ngũ Lão', 'Nguyễn Thái Bình', 'Tao Đàn'];
+  var EXTRA = ['Lê Duẩn', 'Lê Lợi', 'Lê Lai', 'Mạc Đĩnh Chi', 'Nam Kỳ Khởi Nghĩa', 'Điện Biên Phủ', 'Đỗ Quang Đẩu', 'Cô Giang', 'Cô Bắc', 'Đề Thám', 'Phạm Viết Chánh', 'Pasteur', 'Calmette', 'Hàm Nghi', 'Nguyễn Văn Cừ', 'Nguyễn Văn Thủ', 'Nguyễn Trãi', 'Nguyễn Thị Minh Khai', 'Trần Hưng Đạo', 'Nguyễn Công Trứ', 'Xô Viết Nghệ Tĩnh', 'Cách Mạng Tháng 8', 'Tân Định', 'Bến Thành', 'Bến Nghé', 'Sài Gòn', 'Cầu Ông Lãnh', 'Cầu Kho', 'Đa Kao', 'Xuân Hòa', 'Nhiêu Lộc', 'Gia Định', 'Nguyễn Cư Trinh', 'Phạm Ngũ Lão', 'Nguyễn Thái Bình', 'Tao Đàn', 'Cách Mạng Tháng Tám', 'Bàn Cờ', 'Cầu Kiệu', 'Hai Bà Trưng', 'Võ Thị Sáu', 'Lý Chính Thắng', 'Trần Quốc Thảo', 'Bà Huyện Thanh Quan', 'Kỳ Đồng', 'Trần Quốc Toản', 'Võ Văn Tần', 'Lê Văn Sỹ', 'Rạch Bùng Binh', 'Ngô Thời Nhiệm', 'Nguyễn Thượng Hiền', 'Trần Quang Khải'];
   var ALT = new Set(['Lê Văn Sỹ', 'Lê Văn Sĩ']);
   var TOKS = '[\\p{L}\\p{N}]+(?:\\/\\p{N}+)*';
   function keyOf(n) { return (bd(n).match(new RegExp(TOKS, 'gu')) || []).join(' '); }
@@ -87,7 +87,8 @@ var KTCORE = (function () {
 
   function buildChecker(rows) {
     var DICT = new Map();
-    function put(n) { n = n.replace(/^(phường|quận|xã|p\.|q\.)\s*/i, '').trim(); var k = keyOf(n); if (!k) return; var cur = DICT.get(k); if (!cur || (!hasVN(cur) && hasVN(n))) DICT.set(k, n); }
+    function put(n) { n = n.replace(/^(phường|quận|xã|p\.|q\.)\s*/i, '').trim(); if (n === n.toUpperCase()) n = n.toLowerCase().replace(/(^|\s)\p{L}/gu, function (m) { return m.toUpperCase(); }); // "CẦU KIỆU" → "Cầu Kiệu"
+      var k = keyOf(n); if (!k) return; var cur = DICT.get(k); if (!cur || (!hasVN(cur) && hasVN(n))) DICT.set(k, n); }
     (rows || []).forEach(function (r) { var c = r.Cabinet || {}; [c.Road, c.Ward].forEach(function (n) { n = str(n); if (n.length > 3 && !/^\d/.test(n)) put(n.replace(/\s*[-(].*$/, '').trim()); }); });
     EXTRA.forEach(function (n) { DICT.set(keyOf(n), n); });
     var NAMES = Array.from(DICT, function (e) { return { k: e[0], v: e[1], w: e[0].split(' ').length, num: /\d/.test(e[0]) }; }).sort(function (a, b) { return b.k.length - a.k.length; });
@@ -263,7 +264,7 @@ var KTCORE = (function () {
     [/hộp nối/i, 'Hộp nối mới lắp kín nước'],
     [/lắp|tháo|cần đèn|bộ đèn/i, 'Có/không bộ đèn (cần đèn) trước – sau']
   ];
-  var COMMON = 'Kiểm: tên tủ, hạng mục, ngày chụp, số trụ trên dải chữ ảnh; toạ độ ảnh ≤50 m so với CV';
+  var COMMON = 'Kiểm: tên tủ + số PE trên biển, hạng mục, ngày chụp, số trụ trên dải chữ; toạ độ ảnh ≤50 m (toạ độ CV ghi trễ → CẦN XEM); ảnh Hoàn thành không phải chụp ở tủ khác';
   function hint(work) { for (var i = 0; i < HINTS.length; i++) if (HINTS[i][0].test(work || '')) return HINTS[i][1]; return 'Ảnh trước – sau cùng vị trí, thể hiện đúng loại việc'; }
 
   /* ---------- dữ liệu xuất ---------- */
