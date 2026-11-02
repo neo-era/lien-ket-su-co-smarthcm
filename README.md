@@ -9,7 +9,7 @@ Ba **userscript** (chạy bằng Tampermonkey) hỗ trợ công tác duy tu trê
 |---|---|---|---|
 | 1 | **Liên kết sự cố — Duy tu** | [`lien-ket-su-co-smarthcm.user.js`](lien-ket-su-co-smarthcm.user.js) | Ghép và liên kết sự cố cho công việc duy tu (số trụ + vị trí + loại việc), duyệt bảng rồi lưu; tự học từ chỉnh sửa. |
 | 2 | **Báo cáo duy tu trong ngày** | [`bao-cao-duytu-ngay.user.js`](bao-cao-duytu-ngay.user.js) | Tổng hợp kết quả duy tu **toàn KVTT** theo ngày, xuất **Word** mẫu hành chính. |
-| 3 | **Kiểm tra mô tả & ảnh** | [`kiem-tra-mo-ta-anh.user.js`](kiem-tra-mo-ta-anh.user.js) | Soát **chính tả cột Mô tả** (có tự học), **kiểm tra dữ liệu ảnh** tự động, **xem ảnh nhanh** để kết luận Khớp/Không khớp, xuất **Excel**. Chỉ đọc. |
+| 3 | **Kiểm tra mô tả & ảnh** | [`kiem-tra-mo-ta-anh.user.js`](kiem-tra-mo-ta-anh.user.js) | Soát **chính tả cột Mô tả** (có tự học) và **ghi mô tả đã sửa vào SmartHCM** (có xác nhận + hoàn tác), **kiểm tra dữ liệu ảnh** tự động, **xem ảnh nhanh** để kết luận Khớp/Không khớp, xuất **Excel**. |
 
 📄 Hướng dẫn chi tiết (Word): [`HuongDan-CongCu-DuyTu-SmartHCM.docx`](HuongDan-CongCu-DuyTu-SmartHCM.docx)
 
@@ -110,7 +110,7 @@ Công cụ **ghi nhớ cách bạn sửa** và tự áp dụng cho lần sau —
 3. Công cụ tự lấy dữ liệu 8 quận, lọc theo ngày ghi nhận, tải `BaoCao-DuyTu-KVTT-YYYYMMDD.doc`:
    bảng tổng theo quận → mỗi quận có bảng hạng mục + danh sách chi tiết → dòng ký Giám đốc CSKVTT.
 
-## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.0.1)
+## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.1.0)
 
 ![Bảng chính tả](docs/kiemtra-bang.png)
 
@@ -133,7 +133,21 @@ Công cụ **ghi nhớ cách bạn sửa** và tự áp dụng cho lần sau —
 **Tự học chính tả:** bỏ lỗi báo nhầm, sửa đề xuất, hoặc "+ Báo lỗi" → bấm **💾 Ghi nhớ chỉnh sửa** → lần sau tự áp (nhãn 📚).
 Công cụ không tự sửa gì trên hệ thống. Nút **📚 Đã học** xem/xoá từng luật, **Xuất/Nhập JSON** để chuyển máy.
 
-**An toàn:** công cụ **chỉ đọc** — không sửa mô tả, không bấm Lưu/Duyệt/Xoá, không gọi API ghi của trang.
+### 5.1. Ghi mô tả đã sửa vào SmartHCM (v1.1.0)
+
+![Chọn dòng để ghi](docs/kiemtra-ghi-chon.png)
+
+1. Ở tab **Chính tả** (chế độ *Quận đang lọc*), cột **✍** là ô chọn dòng sẽ ghi. Mặc định tick sẵn dòng mức **Lỗi**; dòng **Chuẩn hoá** tự tick nếu muốn.
+   Sửa lại cột **Đề xuất sửa** nếu cần — công cụ ghi đúng nội dung ở cột này.
+2. CV **đã kiểm tra** bị trang khoá (🔒) — công cụ bỏ qua, giống luật của trang (chỉ quản lý đơn vị sửa được CV *chưa kiểm tra*).
+3. Bấm **✍ Ghi vào SmartHCM (n CV)** → hộp xác nhận liệt kê **mô tả cũ → mô tả mới** và số CV → **Ghi**.
+
+![Hộp xác nhận](docs/kiemtra-ghi-xacnhan.png)
+
+- Công cụ dùng **đúng hàm lưu của trang** (như nút "Cập nhật"), chỉ đổi Mô tả; trạng thái, khối lượng, mã tủ giữ nguyên. Ghi theo lô 50 CV, xong tải lại lưới và kiểm lại từng CV.
+- Trước khi ghi tự tải **nhật ký** `NhatKy_SuaMoTa_<Quận>_<ngày giờ>.json` (mã CV, mô tả cũ, mô tả mới). Nút **↩ Hoàn tác lần ghi gần nhất** ghi lại mô tả cũ (chỉ CV chưa bị sửa tiếp và chưa kiểm tra).
+- Không cho ghi khi lưới đang có chỉnh sửa tay chưa bấm "Cập nhật"; CV bị người khác sửa trong lúc duyệt thì bỏ qua và báo lại.
+- Chế độ **Toàn KVTT** chỉ đọc. Không bao giờ Duyệt/Xoá/Kiểm tra công việc.
 
 Mã nguồn có test tự động trong [`kiem-tra-mo-ta-anh/`](kiem-tra-mo-ta-anh/) (`node build.js`, `node test/core.test.js`, `node test/xlsx.test.js`, `node test/ui.test.js`).
 

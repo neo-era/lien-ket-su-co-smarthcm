@@ -17,7 +17,13 @@ trong repo `neo-era/lien-ket-su-co-smarthcm` (cùng 2 công cụ: Liên kết s�
    thêm lỗi cho mô tả không bị báo → lần sau tự báo. Có nhãn 📚, bảng "Đã học" xem/xoá/xuất-nhập JSON.
    Không tự sửa gì trên hệ thống. Mâu thuẫn → giữ đề xuất gốc + nhãn.
 5. Xuất Excel (.xlsx thật, có màu) 4 sheet: Tong_hop, Chinh_ta, So_anh, Kiem_tra_du_lieu.
-6. Chỉ đọc: không gọi API ghi, không bấm Lưu/Duyệt/Xoá. Không gửi dữ liệu ra ngoài (ảnh tải từ CDN của chính hệ thống).
+6. Chỉ đọc, trừ chức năng Ghi (v1.1.0): không Duyệt/Xoá/Kiểm tra; không gửi dữ liệu ra ngoài (ảnh tải từ CDN của chính hệ thống).
+9. (v1.1.0, chốt 02/11/2026) **Ghi mô tả vào SmartHCM**: dùng `LBCS.Service.MaintenanceSvc.SaveReviewMaintTask(rows, false, ok, err)` giống nút "Cập nhật"
+   của trang (`DoSaveChanges`), mỗi phần tử `LBCS.Core.MaintTask {Id, StatusId, CompletedQuantity, Description, CabinetId}`, `Code === 1` là thành công.
+   Chỉ CV `StatusId === 0` (chưa kiểm tra) và người dùng là `isUnitManager` mới sửa được. Chỉ ghi dòng người dùng tick (mặc định tick dòng Lỗi),
+   xác nhận cũ → mới, đọc lại lưới ngay trước khi ghi (bỏ CV bị sửa xen), chặn khi `rowDataTracker` có sửa tay chưa lưu, lô 50, tải nhật ký JSON
+   trước khi ghi, hoàn tác lần ghi gần nhất (lưu localStorage theo quận), tải lại lưới (`LoadMaintTaskList`) và kiểm lại. Chế độ KVTT không ghi.
+   Kiểm chứng thật: CV #2905414 (Quận 1) ghi → hoàn tác → ghi lại, 02/11/2026.
 7. Phạm vi dữ liệu: quận đang lọc (gridOptions) hoặc toàn KVTT 8 quận (API ListMaintTaskNew, Districts[id]=id,
    theo khoảng ngày đang lọc trên trang).
 8. Giao diện hiện đại, nhất quán 3 công cụ; có nút Góp ý (mailto, kèm phiên bản).
@@ -28,7 +34,7 @@ trong repo `neo-era/lien-ket-su-co-smarthcm` (cùng 2 công cụ: Liên kết s�
 - `src/xlsx.js` (thuần): ghi .xlsx tối giản (zip store + CRC32, styles màu, freeze, autofilter, độ rộng cột).
 - `src/ui.js`: panel, bảng kết quả, lớp phủ xem ảnh, bảng Đã học (DOM).
 - `build.js`: ghép header + core + xlsx + ui → `kiem-tra-mo-ta-anh.user.js` (lõi chạy = lõi đã test).
-- Test: `test/core.test.js`, `test/xlsx.test.js` (mở lại bằng openpyxl), `test/ui.test.js` (jsdom/Playwright, gridOptions giả).
+- Test: `test/core.test.js`, `test/xlsx.test.js` (mở lại bằng openpyxl), `test/ui.test.js`, `test/write.test.js` (Playwright, trang giả có gridOptions + LBCS giả).
 
 ## Rủi ro
 - Không vào được trang thật từ môi trường dev (Claude in Chrome lỗi kết nối) → kiểm chứng giao diện bằng trang giả;

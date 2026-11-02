@@ -296,9 +296,54 @@ var KTCORE = (function () {
   function slug(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').replace(/[^A-Za-z0-9]/g, '') || 'Quan'; }
   function validKq(o) { var out = {}; if (!isObj(o)) return out; Object.keys(o).forEach(function (k) { var v = o[k]; if (isObj(v) && KL.indexOf(v.kl) >= 0) out[k] = { kl: v.kl, ct: str(v.ct).slice(0, 2000) }; }); return out; }
 
+
+  /* ---------- GHI MÔ TẢ VÀO SMARTHCM ---------- */
+  function normDesc(x) { return str(x).replace(/\s+/g, ' ').trim(); }
+  function cleanNew(x) { return str(x).replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000); }
+  function defaultSel(it) { return !!it && it.issues.some(function (i) { return i.on && i.kind === 'L'; }); }
+  function editable(r) { return r && Number(r.StatusId) === 0; }
+  // items: danh sách chính tả (có .sel); rows: dữ liệu lưới MỚI NHẤT
+  function writePlan(items, rows) {
+    var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; }));
+    var out = { entries: [], locked: [], changed: [], missing: [] };
+    (items || []).forEach(function (it) {
+      if (!it.sel) return; var nv = cleanNew(it.de); if (!nv || nv === it.s) return;
+      it.ids.forEach(function (id) {
+        var r = by.get(String(id)); if (!r) { out.missing.push(id); return; }
+        if (normDesc(r.Description) !== it.s) { out.changed.push(r.Id); return; }
+        if (!editable(r)) { out.locked.push(r.Id); return; }
+        out.entries.push({ Id: r.Id, StatusId: r.StatusId, CompletedQuantity: r.CompletedQuantity, CabinetId: r.CabinetId, old: str(r.Description), new: nv });
+      });
+    });
+    return out;
+  }
+  function lockedCount(it, rows) { var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; })); return it.ids.filter(function (id) { return !editable(by.get(String(id))); }).length; }
+  function toMaintTask(e) { return { Id: e.Id, StatusId: e.StatusId, CompletedQuantity: e.CompletedQuantity, Description: e.new, CabinetId: e.CabinetId, __type: 'LBCS.Core.MaintTask' }; }
+  function chunk(a, n) { var o = []; for (var i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; }
+  function verifyWrite(entries, rows) {
+    var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; })), o = { ok: [], fail: [] };
+    (entries || []).forEach(function (e) { var r = by.get(String(e.Id)); if (r && normDesc(r.Description) === normDesc(e.new)) o.ok.push(e.Id); else o.fail.push(e.Id); });
+    return o;
+  }
+  function writeLog(entries, meta) { meta = meta || {}; return { v: 1, tool: 'kiem-tra-mo-ta-anh', quan: str(meta.quan), at: str(meta.at), entries: (entries || []).map(function (e) { return { Id: e.Id, StatusId: e.StatusId, CompletedQuantity: e.CompletedQuantity, CabinetId: e.CabinetId, old: e.old, new: e.new }; }) }; }
+  // Hoàn tác: ghi lại mô tả cũ cho CV còn đúng mô tả mới và còn sửa được
+  function undoPlan(log, rows) {
+    var out = { entries: [], locked: [], changed: [], missing: [] };
+    if (!log || !Array.isArray(log.entries)) return out;
+    var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; }));
+    log.entries.forEach(function (e) {
+      if (!e || e.Id == null || typeof e.old !== 'string' || typeof e.new !== 'string') return;
+      var r = by.get(String(e.Id)); if (!r) { out.missing.push(e.Id); return; }
+      if (normDesc(r.Description) !== normDesc(e.new)) { out.changed.push(r.Id); return; }
+      if (!editable(r)) { out.locked.push(r.Id); return; }
+      out.entries.push({ Id: r.Id, StatusId: r.StatusId, CompletedQuantity: r.CompletedQuantity, CabinetId: r.CabinetId, old: str(r.Description), new: e.old });
+    });
+    return out;
+  }
   return { dt: dt, ymd: ymd, dmy: dmy, pad2: pad2, workName: workName, prep: prep, isNum: isNum, num: num, autoChecks: autoChecks,
     bd: bd, lev: lev, buildChecker: buildChecker, EXTRA: EXTRA, spellList: spellList, emptyLearn: emptyLearn, parseLearn: parseLearn,
     serializeLearn: serializeLearn, learnFromCommit: learnFromCommit, pendingCount: pendingCount, learnSummary: learnSummary, forget: forget, mergeLearn: mergeLearn, verdict: verdict,
-    hint: hint, COMMON: COMMON, KL: KL, buildExport: buildExport, slug: slug, validKq: validKq };
+    hint: hint, COMMON: COMMON, KL: KL, buildExport: buildExport, slug: slug, validKq: validKq,
+    normDesc: normDesc, defaultSel: defaultSel, editable: editable, writePlan: writePlan, lockedCount: lockedCount, toMaintTask: toMaintTask, chunk: chunk, verifyWrite: verifyWrite, writeLog: writeLog, undoPlan: undoPlan };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = KTCORE;

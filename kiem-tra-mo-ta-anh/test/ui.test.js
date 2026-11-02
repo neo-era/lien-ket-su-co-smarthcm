@@ -134,7 +134,7 @@ window.LBCS={Service:{MaintenanceSvc:{ListMaintTaskNew:(flt,ok,er)=>{const k=Obj
   ok(!e3.length, 'trang dữ liệu hỏng không lỗi JS: ' + e3.join('|'));
   await p3.close();
   // Chỉ đọc: không gọi hàm ghi
-  ok(!/SaveLinkIncident|Save\w*\(|Delete\w*\(|Approve/.test(US.replace(/\/\/.*$/gm, '')), 'mã không gọi API ghi');
+  { const code = US.replace(/\/\/.*$/gm, ''); const calls = (code.match(/\.(Save\w*|Delete\w*|Update\w*|Clone\w*|\w*Approve\w*)\(/g) || []).filter(x => x !== '.SaveReviewMaintTask('); ok(!calls.length && !/Approve|Delete|SaveLinkIncident/.test(code), 'chỉ gọi đúng hàm ghi SaveReviewMaintTask của trang: ' + calls.join(',')); }
   ok(!errs.length, 'không lỗi JS: ' + errs.join(' | '));
   // Dark mode
   const pd = await b.newPage({ viewport: { width: 1366, height: 768 }, colorScheme: 'dark' }); await pd.route('https://www.smarthcm.city/**', r => r.fulfill({ contentType: 'text/html; charset=utf-8', body: PAGE })); await pd.route('https://cdn.smartiot.city/**', r => r.fulfill({ contentType: 'image/png', body: png(8, 8, [90, 90, 90]) }));

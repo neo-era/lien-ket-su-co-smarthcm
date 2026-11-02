@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Kiểm tra mô tả & ảnh duy tu - SmartHCM
 // @namespace    lavipco.cskvtt
-// @version      1.0.1
-// @description  Soát chính tả cột Mô tả (có tự học), kiểm tra dữ liệu ảnh tự động, xem ảnh nhanh để kết luận Khớp/Không khớp, xuất Excel. Chỉ đọc, không sửa dữ liệu. Chạy trên smarthcm.city.
+// @version      1.1.0
+// @description  Soát chính tả cột Mô tả (có tự học), kiểm tra dữ liệu ảnh tự động, xem ảnh nhanh để kết luận Khớp/Không khớp, xuất Excel. Có chức năng ghi mô tả đã sửa vào SmartHCM (chỉ dòng người dùng chọn, có xác nhận, nhật ký và hoàn tác). Chạy trên smarthcm.city.
 // @author       CSKVTT - LAVIPCO
 // @match        https://smarthcm.city/*
 // @match        https://*.smarthcm.city/*
@@ -20,7 +20,7 @@
  */
 (function () {
 'use strict';
-var KT_VERSION = "1.0.1";
+var KT_VERSION = "1.1.0";
 // ===== LÕI kiểm tra mô tả & ảnh duy tu (thuần, không DOM) — dùng chung userscript & test Node =====
 var KTCORE = (function () {
   'use strict';
@@ -319,10 +319,55 @@ var KTCORE = (function () {
   function slug(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').replace(/[^A-Za-z0-9]/g, '') || 'Quan'; }
   function validKq(o) { var out = {}; if (!isObj(o)) return out; Object.keys(o).forEach(function (k) { var v = o[k]; if (isObj(v) && KL.indexOf(v.kl) >= 0) out[k] = { kl: v.kl, ct: str(v.ct).slice(0, 2000) }; }); return out; }
 
+
+  /* ---------- GHI MÔ TẢ VÀO SMARTHCM ---------- */
+  function normDesc(x) { return str(x).replace(/\s+/g, ' ').trim(); }
+  function cleanNew(x) { return str(x).replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000); }
+  function defaultSel(it) { return !!it && it.issues.some(function (i) { return i.on && i.kind === 'L'; }); }
+  function editable(r) { return r && Number(r.StatusId) === 0; }
+  // items: danh sách chính tả (có .sel); rows: dữ liệu lưới MỚI NHẤT
+  function writePlan(items, rows) {
+    var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; }));
+    var out = { entries: [], locked: [], changed: [], missing: [] };
+    (items || []).forEach(function (it) {
+      if (!it.sel) return; var nv = cleanNew(it.de); if (!nv || nv === it.s) return;
+      it.ids.forEach(function (id) {
+        var r = by.get(String(id)); if (!r) { out.missing.push(id); return; }
+        if (normDesc(r.Description) !== it.s) { out.changed.push(r.Id); return; }
+        if (!editable(r)) { out.locked.push(r.Id); return; }
+        out.entries.push({ Id: r.Id, StatusId: r.StatusId, CompletedQuantity: r.CompletedQuantity, CabinetId: r.CabinetId, old: str(r.Description), new: nv });
+      });
+    });
+    return out;
+  }
+  function lockedCount(it, rows) { var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; })); return it.ids.filter(function (id) { return !editable(by.get(String(id))); }).length; }
+  function toMaintTask(e) { return { Id: e.Id, StatusId: e.StatusId, CompletedQuantity: e.CompletedQuantity, Description: e.new, CabinetId: e.CabinetId, __type: 'LBCS.Core.MaintTask' }; }
+  function chunk(a, n) { var o = []; for (var i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; }
+  function verifyWrite(entries, rows) {
+    var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; })), o = { ok: [], fail: [] };
+    (entries || []).forEach(function (e) { var r = by.get(String(e.Id)); if (r && normDesc(r.Description) === normDesc(e.new)) o.ok.push(e.Id); else o.fail.push(e.Id); });
+    return o;
+  }
+  function writeLog(entries, meta) { meta = meta || {}; return { v: 1, tool: 'kiem-tra-mo-ta-anh', quan: str(meta.quan), at: str(meta.at), entries: (entries || []).map(function (e) { return { Id: e.Id, StatusId: e.StatusId, CompletedQuantity: e.CompletedQuantity, CabinetId: e.CabinetId, old: e.old, new: e.new }; }) }; }
+  // Hoàn tác: ghi lại mô tả cũ cho CV còn đúng mô tả mới và còn sửa được
+  function undoPlan(log, rows) {
+    var out = { entries: [], locked: [], changed: [], missing: [] };
+    if (!log || !Array.isArray(log.entries)) return out;
+    var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; }));
+    log.entries.forEach(function (e) {
+      if (!e || e.Id == null || typeof e.old !== 'string' || typeof e.new !== 'string') return;
+      var r = by.get(String(e.Id)); if (!r) { out.missing.push(e.Id); return; }
+      if (normDesc(r.Description) !== normDesc(e.new)) { out.changed.push(r.Id); return; }
+      if (!editable(r)) { out.locked.push(r.Id); return; }
+      out.entries.push({ Id: r.Id, StatusId: r.StatusId, CompletedQuantity: r.CompletedQuantity, CabinetId: r.CabinetId, old: str(r.Description), new: e.old });
+    });
+    return out;
+  }
   return { dt: dt, ymd: ymd, dmy: dmy, pad2: pad2, workName: workName, prep: prep, isNum: isNum, num: num, autoChecks: autoChecks,
     bd: bd, lev: lev, buildChecker: buildChecker, EXTRA: EXTRA, spellList: spellList, emptyLearn: emptyLearn, parseLearn: parseLearn,
     serializeLearn: serializeLearn, learnFromCommit: learnFromCommit, pendingCount: pendingCount, learnSummary: learnSummary, forget: forget, mergeLearn: mergeLearn, verdict: verdict,
-    hint: hint, COMMON: COMMON, KL: KL, buildExport: buildExport, slug: slug, validKq: validKq };
+    hint: hint, COMMON: COMMON, KL: KL, buildExport: buildExport, slug: slug, validKq: validKq,
+    normDesc: normDesc, defaultSel: defaultSel, editable: editable, writePlan: writePlan, lockedCount: lockedCount, toMaintTask: toMaintTask, chunk: chunk, verifyWrite: verifyWrite, writeLog: writeLog, undoPlan: undoPlan };
 })();
 
 
@@ -428,7 +473,7 @@ var KTXLSX = (function () {
   function nf(n) { return Number(n || 0).toLocaleString('vi-VN'); }
 
   /* ---------- trạng thái ---------- */
-  var S = { mode: 'cur', rows: [], quan: '', auto: [], sp: null, adds: [], day: '', days: [], list: [], kq: {}, idx: 0, learn: C.parseLearn(lsGet(LKEY)), range: '' };
+  var S = { sel: new Map(), written: {}, mode: 'cur', rows: [], quan: '', auto: [], sp: null, adds: [], day: '', days: [], list: [], kq: {}, idx: 0, learn: C.parseLearn(lsGet(LKEY)), range: '' };
   function saveLearn() { lsSet(LKEY, C.serializeLearn(S.learn)); }
   function kqKey() { return 'ktma_kq_v1|' + S.quan + '|' + S.day; }
   function saveKq() { lsSet(kqKey(), JSON.stringify(S.kq)); }
@@ -467,6 +512,11 @@ var KTXLSX = (function () {
     '.k-de{color:#198754;font-weight:600;outline:none;border-radius:6px;padding:2px 4px;min-width:120px;display:block}.k-de:hover{background:var(--k-bg2)}.k-de.ed{color:#0d6efd}',
     '.k-empty{padding:40px;text-align:center;color:var(--k-mut)}',
     '#ktma-md th{top:0}',
+    '.k-wbar{position:sticky;bottom:0;display:flex;align-items:center;gap:10px;padding:10px 12px;margin:8px -14px -14px;border-top:1px solid var(--k-line);background:#fff7ed;color:#7c2d12;z-index:2;flex-wrap:wrap}',
+    '@media (prefers-color-scheme:dark){.k-wbar{background:#2a1d10;color:#fed7aa}}',
+    '.k-wr{background:#b45309;color:#fff}.k-lk{background:#e9ecef;color:#6c757d}.k-done{background:#d1e7dd;color:#0f5132}',
+    '#ktma-root input[type=checkbox]{width:16px;height:16px;accent-color:#b45309;cursor:pointer}',
+    '.k-old{color:#b02a37;text-decoration:line-through}.k-new{color:#198754;font-weight:600}',
     '#ktma-rv{position:fixed;inset:0;z-index:2147483600;background:#0f141b;color:#e5e7eb;display:flex;flex-direction:column}',
     '#ktma-rv .rh{padding:10px 16px;display:grid;grid-template-columns:1fr auto;gap:8px;border-bottom:1px solid #263040;line-height:1.45}',
     '#ktma-rv .im{flex:1;display:flex;gap:8px;padding:8px;min-height:0}#ktma-rv .im figure{flex:1;margin:0;min-width:0;display:flex;flex-direction:column;background:#000;border-radius:8px;overflow:hidden;cursor:zoom-in}',
@@ -553,7 +603,7 @@ var KTXLSX = (function () {
       catch (err) { done({ ok: false }); }
     });
   }
-  async function run() {
+  async function run(quiet) {
     var btn = $('[data-a=run]', pn); btn.disabled = true; var old = btn.textContent; btn.textContent = 'Đang kiểm tra…';
     try {
       var warn = [];
@@ -562,7 +612,7 @@ var KTXLSX = (function () {
         if (!g) throw new Error('Không thấy lưới dữ liệu (gridOptions). Mở đúng trang Quản lý công việc duy tu rồi F5.');
         if (g.type !== 'clientSide') warn.push('Lưới phân trang phía máy chủ — chỉ lấy được phần đang tải.');
         if (!g.rows.length) throw new Error('Lưới đang trống. Chọn quận + khoảng thời gian trên trang trước.');
-        S.rows = g.rows;
+        S.rows = g.rows; S.writable = true;
         S.quan = Array.from(new Set(S.rows.map(function (r) { return (r.Cabinet || {}).District; }).filter(Boolean))).join(', ') || 'Quận đang lọc';
         var rg = pageRange(); S.range = rg ? rg.txt : '';
       } else {
@@ -575,7 +625,7 @@ var KTXLSX = (function () {
           r.rows.forEach(function (x) { x.Cabinet = x.Cabinet || {}; if (!x.Cabinet.District) x.Cabinet.District = DISTRICTS[i].name; acc.push(x); });
         }
         if (err.length) warn.push('Lỗi tải: ' + err.join(', ') + '.');
-        S.rows = acc; S.quan = 'Toàn KVTT';
+        S.rows = acc; S.quan = 'Toàn KVTT'; S.writable = false;
         if (!acc.length) throw new Error('Không có công việc trong khoảng ' + S.range + '.');
       }
       var hasImg = S.rows.some(function (r) { return 'Image1' in r || 'Image3' in r; });
@@ -583,12 +633,12 @@ var KTXLSX = (function () {
       stat('Đang soát ' + nf(S.rows.length) + ' công việc…'); await new Promise(function (r) { setTimeout(r, 30); });
       C.prep(S.rows);
       S.auto = C.autoChecks(S.rows, { images: hasImg });
-      S.sp = C.spellList(S.rows, S.learn); S.adds = [];
+      S.sp = C.spellList(S.rows, S.learn); applySel(); S.adds = [];
       S.days = Array.from(new Set(S.rows.map(function (r) { return r._day; }).filter(Boolean))).sort();
       var di = $('#ktma-day'); di.disabled = !S.days.length; di.min = S.days[0] || ''; di.max = S.days[S.days.length - 1] || '';
       setDay(S.days[S.days.length - 1] || '');
       stat(S.quan + (S.range ? ' · ' + S.range : '') + ' · ' + nf(S.rows.length) + ' CV · ' + nf(S.sp.total) + ' mô tả khác nhau' + (warn.length ? '\n⚠ ' + warn.join(' ') : ''));
-      openRes('ct');
+      if (quiet && $('#ktma-res')) renderRes(); else openRes('ct');
     } catch (e) { stat('⚠ ' + (e && e.message || e)); }
     btn.disabled = false; btn.textContent = old;
   }
@@ -606,7 +656,7 @@ var KTXLSX = (function () {
     tab = t || tab; var res = $('#ktma-res');
     if (!res) {
       res = document.createElement('div'); res.id = 'ktma-res'; res.setAttribute('role', 'dialog'); res.setAttribute('aria-label', 'Kết quả kiểm tra');
-      res.innerHTML = '<div class="top"><div class="k-tabs"></div><div style="display:flex;gap:6px"><button class="k-gh" data-r="commit" title="Lưu các chỉnh sửa của anh để lần sau tự áp">💾 Ghi nhớ chỉnh sửa</button><button class="k-gh" data-r="learn">📚 Đã học</button><button class="k-gh" data-r="close" aria-label="Đóng">✕</button></div></div><div class="body"></div>';
+      res.innerHTML = '<div class="top"><div class="k-tabs"></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="k-gh" data-r="undo" hidden title="Ghi lại mô tả cũ của lần ghi gần nhất">↩ Hoàn tác lần ghi gần nhất</button><button class="k-gh" data-r="commit" title="Lưu các chỉnh sửa của anh để lần sau tự áp">💾 Ghi nhớ chỉnh sửa</button><button class="k-gh" data-r="learn">📚 Đã học</button><button class="k-gh" data-r="close" aria-label="Đóng">✕</button></div></div><div class="body"></div>';
       root.appendChild(res);
       if (window.innerWidth <= 1100) pn.classList.add('min');
       res.addEventListener('click', onResClick);
@@ -627,13 +677,16 @@ var KTXLSX = (function () {
     var tools = '<div class="tools"><input id="ktma-f" placeholder="Lọc theo chữ…" value="' + esc(filt) + '" aria-label="Lọc"><span class="k-st">' + esc(S.quan) + (S.range ? ' · ' + esc(S.range) : '') + '</span></div>';
     if (tab === 'ct') {
       var its = S.sp.items.filter(function (it) { return !f || it.s.toLowerCase().indexOf(f) >= 0; });
-      h = tools + (its.length ? '<table><thead><tr><th>#</th><th>Mô tả gốc</th><th>Lỗi <span style="font-weight:400">(bấm để bỏ/bật — báo nhầm thì bỏ)</span></th><th>Đề xuất sửa <span style="font-weight:400">(bấm để sửa)</span></th><th>Số CV</th></tr></thead><tbody>'
+      var cw = canWrite();
+      h = tools + (its.length ? '<table><thead><tr>' + (cw ? '<th title="Chọn để ghi vào SmartHCM">✍</th>' : '') + '<th>#</th><th>Mô tả gốc</th><th>Lỗi <span style="font-weight:400">(bấm để bỏ/bật — báo nhầm thì bỏ)</span></th><th>Đề xuất sửa <span style="font-weight:400">(bấm để sửa)</span></th><th>Số CV</th></tr></thead><tbody>'
         + its.map(function (it) {
           var ix = it._ix;
-          return '<tr><td>' + (ix + 1) + '</td><td>' + esc(it.s) + '</td><td>' + it.issues.map(function (i, j) {
+          var lk = it._lk || 0, all = lk >= it.n, chg = C.normDesc(it.de) !== it.s && !!C.normDesc(it.de), wt = S.written[it.s];
+          var cb = cw ? '<td><input type="checkbox" data-sel="' + ix + '"' + (it.sel && !all && chg ? ' checked' : '') + (all || !chg ? ' disabled' : '') + ' aria-label="Chọn để ghi" title="' + (all ? 'Tất cả CV đã kiểm tra — trang khoá' : !chg ? 'Đề xuất giống mô tả gốc' : 'Chọn để ghi vào SmartHCM') + '"></td>' : '';
+          return '<tr>' + cb + '<td>' + (ix + 1) + '</td><td>' + esc(it.s) + (wt ? '<span class="k-lr" style="color:#0f5132">✓ đã ghi ' + esc(wt) + '</span>' : '') + '</td><td>' + it.issues.map(function (i, j) {
             return '<span class="k-chip ' + (i.on ? 'k-' + i.kind : 'k-off') + '" data-i="' + ix + '" data-j="' + j + '" role="button" tabindex="0" title="Bấm để ' + (i.on ? 'bỏ (báo nhầm)' : 'bật lại') + '">' + esc(i.text) + '</span>' + (i.learned ? '<span class="k-lr">' + esc(i.learned) + '</span>' : '');
-          }).join('') + '</td><td><span class="k-de' + (it.de !== it.defDe ? ' ed' : '') + '" contenteditable="plaintext-only" data-de="' + ix + '" aria-label="Đề xuất sửa">' + esc(it.de) + '</span>' + (it.deLearned ? '<span class="k-lr">📚 đề xuất đã học</span>' : '') + '</td><td>' + it.n + '</td></tr>';
-        }).join('') + '</tbody></table>' : '<div class="k-empty">Không có mô tả bị báo lỗi 🎉</div>');
+          }).join('') + '</td><td><span class="k-de' + (it.de !== it.defDe ? ' ed' : '') + '" contenteditable="plaintext-only" data-de="' + ix + '" aria-label="Đề xuất sửa">' + esc(it.de) + '</span>' + (it.deLearned ? '<span class="k-lr">📚 đề xuất đã học</span>' : '') + '</td><td>' + it.n + (lk ? ' <span class="k-chip k-lk" title="CV đã kiểm tra — trang không cho sửa">🔒' + (all ? ' đã kiểm tra' : lk) + '</span>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table>' : '<div class="k-empty">Không có mô tả bị báo lỗi 🎉</div>') + (cw ? wbar() : '');
     } else if (tab === 'kb') {
       var un = S.sp.unflag.filter(function (s) { return !f || s.toLowerCase().indexOf(f) >= 0; });
       h = tools + '<div class="k-st" style="margin-bottom:6px">Mô tả bộ lọc không báo. Thấy sai (thiếu chữ, gõ nhầm…) thì bấm "+ Báo lỗi" — lần sau công cụ tự báo.</div>'
@@ -661,7 +714,8 @@ var KTXLSX = (function () {
   function onResClick(e) {
     var t = e.target;
     var tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; renderRes(); return; }
-    var ch = t.closest('.k-chip[data-i]'); if (ch) { var it = S.sp.items[+ch.dataset.i], is = it.issues[+ch.dataset.j]; is.on = !is.on; if (!it.deLearned) recomputeDe(it); renderRes(); kpis(); return; }
+    var ch = t.closest('.k-chip[data-i]'); if (ch) { var it = S.sp.items[+ch.dataset.i], is = it.issues[+ch.dataset.j]; is.on = !is.on; if (!it.deLearned) recomputeDe(it); if (!S.sel.has(it.s)) it.sel = C.defaultSel(it); renderRes(); kpis(); return; }
+    var sb = t.closest('[data-sel]'); if (sb) { var it2 = S.sp.items[+sb.dataset.sel]; it2.sel = sb.checked; S.sel.set(it2.s, sb.checked); updWbar(); return; }
     var rv = t.closest('[data-rv]'); if (rv) { openReview(+rv.dataset.rv); return; }
     var ad = t.closest('[data-add]'); if (ad) { addErr(ad.dataset.add); return; }
     var r = t.closest('[data-r]'); if (!r) return;
@@ -669,6 +723,8 @@ var KTXLSX = (function () {
     else if (r.dataset.r === 'learn') openLearn();
     else if (r.dataset.r === 'commit') commit(true);
     else if (r.dataset.r === 'review') openReview(firstUnread());
+    else if (r.dataset.r === 'write') openWrite();
+    else if (r.dataset.r === 'undo') openUndo();
   }
   var ft = null;
   function onResInput(e) {
@@ -685,9 +741,91 @@ var KTXLSX = (function () {
   function commit(show) {
     if (!S.sp) return 0;
     var n = C.learnFromCommit(S.learn, S.sp.items, S.adds);
-    if (n) { saveLearn(); S.sp = C.spellList(S.rows, S.learn); S.adds = []; nLearn(); kpis(); renderRes(); }
+    if (n) { saveLearn(); S.sp = C.spellList(S.rows, S.learn); applySel(); S.adds = []; nLearn(); kpis(); renderRes(); }
     if (show) toast(n ? 'Đã ghi nhớ ' + n + ' chỉnh sửa — lần sau tự áp.' : 'Không có chỉnh sửa mới để ghi nhớ.');
     return n;
+  }
+
+  /* ---------- GHI MÔ TẢ VÀO SMARTHCM ---------- */
+  var WKEY = 'ktma_lastwrite_v1|';
+  function svc() { try { return window.LBCS && LBCS.Service && LBCS.Service.MaintenanceSvc && typeof LBCS.Service.MaintenanceSvc.SaveReviewMaintTask === 'function' ? LBCS.Service.MaintenanceSvc : null; } catch (e) { return null; } }
+  function canWrite() { return S.mode === 'cur' && S.writable && !!svc(); }
+  function applySel() {
+    if (!S.sp) return;
+    S.sp.items.forEach(function (it) { it._lk = C.lockedCount(it, S.rows); it.sel = it._lk >= it.n ? false : (S.sel.has(it.s) ? S.sel.get(it.s) : C.defaultSel(it)); });
+    var u = $('[data-r=undo]'); if (u) u.hidden = !(canWrite() && lastLog());
+  }
+  function selInfo() {
+    var n = 0, cv = 0, lk = 0;
+    S.sp.items.forEach(function (it) { if (!it.sel) return; var nv = C.normDesc(it.de); if (!nv || nv === it.s) return; var l = it._lk || 0; if (l >= it.n) return; n++; cv += it.n - l; lk += l; });
+    return { n: n, cv: cv, lk: lk };
+  }
+  function wbar() { var i = selInfo(); return '<div class="k-wbar" id="ktma-wbar"><b>Đã chọn ' + i.n + ' mô tả · ' + i.cv + ' CV sẽ ghi</b>' + (i.lk ? '<span>(' + i.lk + ' CV đã kiểm tra bị khoá, bỏ qua)</span>' : '') + '<span style="flex:1"></span><button class="k-wr" data-r="write"' + (i.cv ? '' : ' disabled') + '>✍ Ghi vào SmartHCM (' + i.cv + ' CV)</button></div>'; }
+  function updWbar() { var w = $('#ktma-wbar'); if (w) w.outerHTML = wbar(); }
+  function lastLog() { try { var o = JSON.parse(lsGet(WKEY + S.quan) || 'null'); return o && Array.isArray(o.entries) && o.entries.length ? o : null; } catch (e) { return null; } }
+  function freshGrid() { var g = gridRows(); return g ? g.rows : []; }
+  function pendingGridEdits() { try { return typeof rowDataTracker !== 'undefined' && rowDataTracker && Object.keys(rowDataTracker).length > 0; } catch (e) { return false; } }
+  function stamp() { var d = new Date(); return d.getFullYear() + '-' + C.pad2(d.getMonth() + 1) + '-' + C.pad2(d.getDate()) + '_' + C.pad2(d.getHours()) + C.pad2(d.getMinutes()); }
+  function modal(html) { var md = $('#ktma-md'); if (md) md.remove(); md = document.createElement('div'); md.id = 'ktma-md'; md.innerHTML = '<div class="box" role="dialog" aria-modal="true">' + html + '</div>'; root.appendChild(md); return md; }
+  function planHtml(plan, title, btn) {
+    var g = new Map(); plan.entries.forEach(function (e) { var k = C.normDesc(e.old) + '\u0000' + e.new; if (!g.has(k)) g.set(k, { o: C.normDesc(e.old), n: e.new, c: 0 }); g.get(k).c++; });
+    var notes = []; if (plan.locked.length) notes.push(plan.locked.length + ' CV đã kiểm tra (trang khoá) — bỏ qua'); if (plan.changed.length) notes.push(plan.changed.length + ' CV mô tả đã bị sửa từ lúc kiểm tra — bỏ qua'); if (plan.missing.length) notes.push(plan.missing.length + ' CV không còn trong lưới — bỏ qua');
+    return '<div class="top"><b>' + esc(title) + '</b><button class="k-gh" data-w="x" aria-label="Đóng">✕</button></div><div class="body">'
+      + (g.size ? '<table><thead><tr><th style="width:70px">Số CV</th><th>Mô tả cũ → mô tả mới</th></tr></thead><tbody>' + Array.from(g.values()).map(function (x) { return '<tr><td>' + x.c + '</td><td><span class="k-old">' + esc(x.o) + '</span><br><span class="k-new">' + esc(x.n) + '</span></td></tr>'; }).join('') + '</tbody></table>' : '<div class="k-empty">Không còn CV nào ghi được.</div>')
+      + (notes.length ? '<p class="k-st">⚠ ' + esc(notes.join(' · ')) + '</p>' : '')
+      + '<p class="k-st" id="ktma-wst">Chỉ đổi cột Mô tả; trạng thái, khối lượng, mã tủ giữ nguyên. Trước khi ghi, công cụ tải file nhật ký để hoàn tác.</p></div>'
+      + '<div class="top" style="border-top:1px solid var(--k-line);border-bottom:0;justify-content:flex-end"><button class="k-gh" data-w="x">Huỷ</button><button class="k-wr" data-w="go"' + (plan.entries.length ? '' : ' disabled') + '>' + esc(btn) + ' (' + plan.entries.length + ' CV)</button></div>';
+  }
+  function openWrite() {
+    if (!canWrite()) return;
+    if (pendingGridEdits()) { toast('Lưới SmartHCM đang có chỉnh sửa tay chưa bấm Cập nhật — lưu hoặc huỷ trước khi ghi.'); return; }
+    var plan = C.writePlan(S.sp.items, freshGrid());
+    var md = modal(planHtml(plan, '✍ Xác nhận ghi vào SmartHCM — ' + S.quan, 'Ghi'));
+    md.onclick = function (e) { if (e.target === md || e.target.closest('[data-w=x]')) { if (!S.busy) md.remove(); } else if (e.target.closest('[data-w=go]')) doWrite(plan, false); };
+  }
+  function openUndo() {
+    var lg = lastLog(); if (!lg || !canWrite()) { toast('Không có lần ghi nào để hoàn tác.'); return; }
+    if (pendingGridEdits()) { toast('Lưới SmartHCM đang có chỉnh sửa tay chưa bấm Cập nhật — lưu hoặc huỷ trước.'); return; }
+    var plan = C.undoPlan(lg, freshGrid());
+    var md = modal(planHtml(plan, '↩ Hoàn tác lần ghi ' + (lg.at || '') + ' — ' + S.quan, 'Hoàn tác'));
+    md.onclick = function (e) { if (e.target === md || e.target.closest('[data-w=x]')) { if (!S.busy) md.remove(); } else if (e.target.closest('[data-w=go]')) doWrite(plan, true); };
+  }
+  function saveChunk(entries) {
+    return new Promise(function (res) {
+      var to = setTimeout(function () { res({ ok: false, msg: 'Hết thời gian chờ máy chủ' }); }, 60000);
+      var done = function (v) { clearTimeout(to); res(v); };
+      try {
+        var tasks = entries.map(function (e) { var o = C.toMaintTask(e), mt; try { mt = (window.LBCS && LBCS.Core && typeof LBCS.Core.MaintTask === 'function') ? new LBCS.Core.MaintTask() : {}; } catch (er) { mt = {}; } Object.keys(o).forEach(function (k) { mt[k] = o[k]; }); return mt; });
+        svc().SaveReviewMaintTask(tasks, false, function (d) { done(d && d.Code === 1 ? { ok: true } : { ok: false, msg: (d && d.Message) || 'Máy chủ từ chối' }); }, function (er) { done({ ok: false, msg: (er && (er._message || er.message)) || 'Lỗi kết nối' }); });
+      } catch (er) { done({ ok: false, msg: String(er && er.message || er) }); }
+    });
+  }
+  async function waitGrid(entries) {
+    try { if (typeof window.LoadMaintTaskList === 'function') window.LoadMaintTaskList(); } catch (e) { }
+    var v = null;
+    for (var t = 0; t < 25; t++) { await new Promise(function (r) { setTimeout(r, 1000); }); v = C.verifyWrite(entries, freshGrid()); if (!v.fail.length) break; }
+    return v || C.verifyWrite(entries, freshGrid());
+  }
+  async function doWrite(plan, isUndo) {
+    if (S.busy || !plan.entries.length) return; S.busy = true;
+    var st = $('#ktma-wst'), go = $('[data-w=go]'); if (go) go.disabled = true;
+    var at = stamp(), log = C.writeLog(plan.entries, { quan: S.quan, at: at.replace('_', ' ') });
+    dl(new Blob([JSON.stringify(log, null, 1)], { type: 'application/json' }), 'NhatKy_' + (isUndo ? 'HoanTac' : 'SuaMoTa') + '_' + C.slug(S.quan) + '_' + at + '.json');
+    var parts = C.chunk(plan.entries, 50), okE = [], errs = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (st) st.textContent = 'Đang ghi lô ' + (i + 1) + '/' + parts.length + '…';
+      var r = await saveChunk(parts[i]);
+      if (r.ok) okE = okE.concat(parts[i]); else errs.push('Lô ' + (i + 1) + ': ' + r.msg);
+    }
+    if (st) st.textContent = 'Đang tải lại lưới và kiểm lại…';
+    var v = await waitGrid(okE);
+    if (okE.length) lsSet(WKEY + S.quan, JSON.stringify(isUndo ? C.writeLog([], {}) : C.writeLog(okE, { quan: S.quan, at: at.replace('_', ' ') })));
+    var hm = at.slice(11, 13) + ':' + at.slice(13, 15);
+    if (!isUndo) S.sp.items.forEach(function (it) { if (it.sel && okE.some(function (e) { return C.normDesc(e.old) === it.s; })) S.written[C.normDesc(it.de)] = hm; });
+    S.busy = false; var md = $('#ktma-md'); if (md) md.remove();
+    var msg = (isUndo ? 'Hoàn tác' : 'Đã ghi') + ' ' + v.ok.length + '/' + plan.entries.length + ' CV' + (v.fail.length ? ' · ' + v.fail.length + ' CV chưa thấy đổi trên lưới' : '') + (errs.length ? ' · LỖI ' + errs.join('; ') : '');
+    await run(true);
+    toast(msg); stat(msg + (v.fail.length ? '\nCV cần kiểm lại: ' + v.fail.slice(0, 30).join(', ') : ''));
   }
 
   /* ---------- MÀN XEM ẢNH ---------- */
@@ -782,7 +920,7 @@ var KTXLSX = (function () {
         else if (t.closest('[data-l=imp]')) { var fi = document.createElement('input'); fi.type = 'file'; fi.accept = '.json,application/json'; fi.onchange = function () { var f = fi.files[0]; if (!f) return; f.text().then(function (txt) { var L2 = C.parseLearn(txt); var n = C.learnSummary(L2).length; if (!n) { toast('File không có dữ liệu học hợp lệ.'); return; } C.mergeLearn(S.learn, L2); after(); toast('Đã nhập ' + n + ' mục.'); }).catch(function () { toast('Không đọc được file.'); }); }; fi.click(); }
       };
     }
-    function after() { saveLearn(); nLearn(); if (S.rows.length) { S.sp = C.spellList(S.rows, S.learn); kpis(); renderRes(); } render(); }
+    function after() { saveLearn(); nLearn(); if (S.rows.length) { S.sp = C.spellList(S.rows, S.learn); applySel(); kpis(); renderRes(); } render(); }
     var esck = function (e) { if (e.key === 'Escape' && document.getElementById('ktma-md')) { e.stopPropagation(); md.remove(); } if (!document.getElementById('ktma-md')) document.removeEventListener('keydown', esck, true); };
     document.addEventListener('keydown', esck, true);
     render();
@@ -813,7 +951,7 @@ var KTXLSX = (function () {
     window.open('mailto:maivulam2020@gmail.com?subject=' + encodeURIComponent('[Góp ý] Kiểm tra mô tả & ảnh v' + VER) + '&body=' + encodeURIComponent(body));
   }
 
-  window.__ktma = { S: S, run: run, openRes: openRes, openReview: openReview, exportXlsx: exportXlsx, commit: commit, setDay: setDay, openLearn: openLearn };
+  window.__ktma = { S: S, run: run, openWrite: openWrite, openUndo: openUndo, doWrite: doWrite, openRes: openRes, openReview: openReview, exportXlsx: exportXlsx, commit: commit, setDay: setDay, openLearn: openLearn };
 })();
 
 })();

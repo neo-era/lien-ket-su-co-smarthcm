@@ -167,5 +167,42 @@ ok(C.validKq({ a: 5, b: { kl: 'KHỚP' }, c: { kl: 'X' } }).b && !C.validKq({ a:
   const t0 = Date.now(); const spb = C.spellList(big, C.emptyLearn()); const ms = Date.now() - t0;
   ok(ms < 8000, 'hiệu năng 10.000 mô tả < 8 s: ' + ms + ' ms'); ok(spb.total === 10000, 'đủ 10.000 mô tả'); console.log('  (10.000 mô tả: ' + ms + ' ms)'); }
 
+// ---------- GHI VÀO SMARTHCM (v1.1.0) ----------
+{ const R2 = (id, d, st, extra) => Object.assign({ Id: id, Description: d, StatusId: st, CompletedQuantity: 1.5, CabinetId: 77, Cabinet: { BoxName: 'T' } }, extra || {});
+  const rowsW = [R2(1, 'Thay bóng đường Lê Duẫn', 0), R2(2, 'Thay bóng  đường Lê Duẫn ', 0), R2(3, 'Thay bóng đường Lê Duẫn', 10), R2(4, 'Sơn trụ tr 7 Cô Giang', 0), R2(5, 'Tháo băng rôn trụ số 2,đường Lê Lợi', 0)];
+  const spW = C.spellList(rowsW, C.emptyLearn());
+  const iW = s => spW.items.find(o => o.s === s);
+  ok(C.defaultSel(iW('Thay bóng đường Lê Duẫn')) === true, 'mặc định tick dòng mức Lỗi');
+  ok(C.defaultSel(iW('Tháo băng rôn trụ số 2,đường Lê Lợi')) === false, 'mặc định không tick dòng Chuẩn hoá');
+  iW('Thay bóng đường Lê Duẫn').sel = true; iW('Sơn trụ tr 7 Cô Giang').sel = false; iW('Tháo băng rôn trụ số 2,đường Lê Lợi').sel = true;
+  const plan = C.writePlan(spW.items, rowsW);
+  eq(plan.entries.map(e => e.Id).sort().join(), '1,2,5', 'kế hoạch ghi: CV chưa kiểm tra của dòng được tick');
+  eq(plan.locked.join(), '3', 'CV đã kiểm tra (StatusId 10) bị khoá');
+  const e2 = plan.entries.find(e => e.Id === 2);
+  eq(e2.old, 'Thay bóng  đường Lê Duẫn ', 'giữ nguyên mô tả gốc (kể cả khoảng trắng) để hoàn tác');
+  eq(e2.new, 'Thay bóng đường Lê Duẩn', 'mô tả mới = đề xuất');
+  eq([e2.StatusId, e2.CompletedQuantity, e2.CabinetId].join(), '0,1.5,77', 'giữ nguyên trạng thái, khối lượng, mã tủ');
+  const mt = C.toMaintTask(e2); eq(mt.__type, 'LBCS.Core.MaintTask', 'đối tượng gửi đúng kiểu'); eq(Object.keys(mt).sort().join(), 'CabinetId,CompletedQuantity,Description,Id,StatusId,__type', 'chỉ gửi 6 trường như trang');
+  // Mô tả bị người khác sửa trong lúc duyệt → bỏ qua
+  const fresh = rowsW.map(r => Object.assign({}, r)); fresh[0].Description = 'Người khác đã sửa';
+  const plan2 = C.writePlan(spW.items, fresh); ok(!plan2.entries.some(e => e.Id === 1) && plan2.changed.includes(1), 'mô tả đã bị sửa xen → bỏ qua, báo lại');
+  // Đề xuất trống / không đổi → không ghi
+  const it4 = iW('Sơn trụ tr 7 Cô Giang'); it4.sel = true; it4.de = it4.s; ok(!C.writePlan(spW.items, rowsW).entries.some(e => e.Id === 4), 'đề xuất giống mô tả gốc → không ghi');
+  it4.de = '   '; ok(!C.writePlan(spW.items, rowsW).entries.some(e => e.Id === 4), 'đề xuất trống → không ghi');
+  it4.de = 'Sơn trụ số 7 Cô Giang\u0007'; eq(C.writePlan(spW.items, rowsW).entries.find(e => e.Id === 4).new, 'Sơn trụ số 7 Cô Giang', 'bỏ ký tự điều khiển');
+  // Chia lô 50
+  eq(C.chunk(Array.from({ length: 120 }, (_, i) => i), 50).map(a => a.length).join(), '50,50,20', 'chia lô 50');
+  // Kiểm lại sau ghi
+  const after = rowsW.map(r => Object.assign({}, r)); after[0].Description = 'Thay bóng đường Lê Duẩn'; // CV 2 chưa đổi
+  const v = C.verifyWrite(plan.entries, after); eq(v.ok.join(), '1', 'kiểm lại: CV đã đổi'); ok(v.fail.includes(2) && v.fail.includes(5), 'kiểm lại: CV chưa đổi bị báo');
+  // Hoàn tác: chỉ CV còn đúng mô tả mới và còn chưa kiểm tra
+  const cur = rowsW.map(r => Object.assign({}, r)); cur[0].Description = 'Thay bóng đường Lê Duẩn'; cur[1].Description = 'Thay bóng đường Lê Duẩn'; cur[1].StatusId = 10; cur[4].Description = 'Tháo băng rôn trụ số 2, đường Lê Lợi đã sửa tay';
+  const u = C.undoPlan({ entries: plan.entries }, cur);
+  eq(u.entries.map(e => e.Id).join(), '1', 'hoàn tác chỉ CV còn mô tả mới + chưa kiểm tra'); eq(u.entries[0].new, 'Thay bóng đường Lê Duẫn', 'hoàn tác ghi lại mô tả cũ');
+  eq(u.locked.join(), '2', 'hoàn tác: CV đã kiểm tra bị khoá'); eq(u.changed.join(), '5', 'hoàn tác: CV bị sửa sau đó bỏ qua');
+  ok(C.undoPlan(null, cur).entries.length === 0 && C.undoPlan({ entries: 'x' }, cur).entries.length === 0, 'nhật ký hỏng → không làm gì');
+  const lg = C.writeLog(plan.entries, { quan: 'Quận 1', at: '2026-11-02T09:15:00' }); ok(lg.v === 1 && lg.entries.length === 3 && lg.quan === 'Quận 1', 'nhật ký ghi có đủ thông tin');
+}
+
 console.log('core: ' + pass + ' pass, ' + fail + ' fail'); fails.forEach(f => console.log('  ✗ ' + f));
 process.exit(fail ? 1 : 0);

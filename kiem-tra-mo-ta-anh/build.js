@@ -1,11 +1,11 @@
 const fs = require('fs');
-const VER = '1.0.1';
+const VER = '1.1.0';
 const RAW = 'https://raw.githubusercontent.com/neo-era/lien-ket-su-co-smarthcm/main/kiem-tra-mo-ta-anh.user.js';
 const head = `// ==UserScript==
 // @name         Kiểm tra mô tả & ảnh duy tu - SmartHCM
 // @namespace    lavipco.cskvtt
 // @version      ${VER}
-// @description  Soát chính tả cột Mô tả (có tự học), kiểm tra dữ liệu ảnh tự động, xem ảnh nhanh để kết luận Khớp/Không khớp, xuất Excel. Chỉ đọc, không sửa dữ liệu. Chạy trên smarthcm.city.
+// @description  Soát chính tả cột Mô tả (có tự học), kiểm tra dữ liệu ảnh tự động, xem ảnh nhanh để kết luận Khớp/Không khớp, xuất Excel. Có chức năng ghi mô tả đã sửa vào SmartHCM (chỉ dòng người dùng chọn, có xác nhận, nhật ký và hoàn tác). Chạy trên smarthcm.city.
 // @author       CSKVTT - LAVIPCO
 // @match        https://smarthcm.city/*
 // @match        https://*.smarthcm.city/*
