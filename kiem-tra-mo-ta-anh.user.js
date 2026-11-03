@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kiểm tra mô tả & ảnh duy tu - SmartHCM
 // @namespace    lavipco.cskvtt
-// @version      1.1.0
+// @version      1.1.1
 // @description  Soát chính tả cột Mô tả (có tự học), kiểm tra dữ liệu ảnh tự động, xem ảnh nhanh để kết luận Khớp/Không khớp, xuất Excel. Có chức năng ghi mô tả đã sửa vào SmartHCM (chỉ dòng người dùng chọn, có xác nhận, nhật ký và hoàn tác). Chạy trên smarthcm.city.
 // @author       CSKVTT - LAVIPCO
 // @match        https://smarthcm.city/*
@@ -20,7 +20,7 @@
  */
 (function () {
 'use strict';
-var KT_VERSION = "1.1.0";
+var KT_VERSION = "1.1.1";
 // ===== LÕI kiểm tra mô tả & ảnh duy tu (thuần, không DOM) — dùng chung userscript & test Node =====
 var KTCORE = (function () {
   'use strict';
@@ -800,6 +800,7 @@ var KTXLSX = (function () {
       } catch (er) { done({ ok: false, msg: String(er && er.message || er) }); }
     });
   }
+  function cleanMsg(m) { return String(m || '').replace(/<[^>]*>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 300) || 'Máy chủ từ chối'; }
   async function waitGrid(entries) {
     try { if (typeof window.LoadMaintTaskList === 'function') window.LoadMaintTaskList(); } catch (e) { }
     var v = null;
@@ -815,7 +816,14 @@ var KTXLSX = (function () {
     for (var i = 0; i < parts.length; i++) {
       if (st) st.textContent = 'Đang ghi lô ' + (i + 1) + '/' + parts.length + '…';
       var r = await saveChunk(parts[i]);
-      if (r.ok) okE = okE.concat(parts[i]); else errs.push('Lô ' + (i + 1) + ': ' + r.msg);
+      if (r.ok) { okE = okE.concat(parts[i]); continue; }
+      if (parts[i].length === 1) { errs.push({ id: parts[i][0].Id, msg: cleanMsg(r.msg) }); continue; }
+      // Máy chủ từ chối cả lô khi chỉ 1 CV không hợp lệ → ghi lại từng CV để các CV hợp lệ vẫn được lưu
+      for (var j = 0; j < parts[i].length; j++) {
+        if (st) st.textContent = 'Lô ' + (i + 1) + ' bị từ chối — ghi lại từng CV (' + (j + 1) + '/' + parts[i].length + ')…';
+        var r1 = await saveChunk([parts[i][j]]);
+        if (r1.ok) okE.push(parts[i][j]); else errs.push({ id: parts[i][j].Id, msg: cleanMsg(r1.msg) });
+      }
     }
     if (st) st.textContent = 'Đang tải lại lưới và kiểm lại…';
     var v = await waitGrid(okE);
@@ -823,9 +831,12 @@ var KTXLSX = (function () {
     var hm = at.slice(11, 13) + ':' + at.slice(13, 15);
     if (!isUndo) S.sp.items.forEach(function (it) { if (it.sel && okE.some(function (e) { return C.normDesc(e.old) === it.s; })) S.written[C.normDesc(it.de)] = hm; });
     S.busy = false; var md = $('#ktma-md'); if (md) md.remove();
-    var msg = (isUndo ? 'Hoàn tác' : 'Đã ghi') + ' ' + v.ok.length + '/' + plan.entries.length + ' CV' + (v.fail.length ? ' · ' + v.fail.length + ' CV chưa thấy đổi trên lưới' : '') + (errs.length ? ' · LỖI ' + errs.join('; ') : '');
+    var grp = {}; errs.forEach(function (e) { var k = e.msg.replace(/Công việc mã\s*\d+\s*:?\s*/i, '').trim() || e.msg; (grp[k] = grp[k] || []).push(e.id); });
+    var errTxt = Object.keys(grp).map(function (k) { return grp[k].length + ' CV không ghi được — ' + k + ' (CV ' + grp[k].slice(0, 20).join(', ') + (grp[k].length > 20 ? '…' : '') + ')'; }).join('\n');
+    var msg = (isUndo ? 'Hoàn tác' : 'Đã ghi') + ' ' + v.ok.length + '/' + plan.entries.length + ' CV' + (v.fail.length ? ' · ' + v.fail.length + ' CV chưa thấy đổi trên lưới' : '') + (errs.length ? ' · ' + errs.length + ' CV bị máy chủ từ chối' : '');
+    var detail = errTxt;
     await run(true);
-    toast(msg); stat(msg + (v.fail.length ? '\nCV cần kiểm lại: ' + v.fail.slice(0, 30).join(', ') : ''));
+    toast(msg); stat(msg + (detail ? '\n⚠ ' + detail : '') + (v.fail.length ? '\nCV cần kiểm lại: ' + v.fail.slice(0, 30).join(', ') : ''));
   }
 
   /* ---------- MÀN XEM ẢNH ---------- */

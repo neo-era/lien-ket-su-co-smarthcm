@@ -17,6 +17,7 @@ window.gridOptions={api:{forEachNode:f=>window.__ROWS.forEach(d=>f({data:d})),ge
 window.LBCS={Core:{MaintTask:function(){}},Service:{MaintenanceSvc:{ListMaintTaskNew:(f,ok)=>ok(Object.keys(f.Districts)[0]==='1'?JSON.parse(JSON.stringify(window.__ROWS)):[]),
  SaveReviewMaintTask:(rows,flag,ok,er)=>{window.__CALLS.push({n:rows.length,flag,keys:Object.keys(rows[0]).sort().join(),ctor:rows[0] instanceof LBCS.Core.MaintTask,rows:JSON.parse(JSON.stringify(rows))});
    if(window.__FAIL_ON&&window.__CALLS.length===window.__FAIL_ON){setTimeout(()=>ok({Code:0,Message:'Từ chối giả lập'}),10);return;}
+   const bad=rows.find(r=>(window.__BAD||[]).includes(r.Id));if(bad){setTimeout(()=>ok({Code:0,Message:'Công việc mã '+bad.Id+': cần cung cấp thông tin Trụ<br /><img src=x onerror="window.__XSS=1">'}),10);return;}
    window.__PENDING=(window.__PENDING||[]).concat(rows);setTimeout(()=>ok({Code:1}),10);}}}};
 window.LoadMaintTaskList=function(){setTimeout(()=>{(window.__PENDING||[]).forEach(t=>{const r=window.__ROWS.find(x=>x.Id===t.Id);if(r)r.Description=t.Description;});window.__PENDING=[];window.__LOADS=(window.__LOADS||0)+1;},300);};
 </script></body></html>`;
@@ -78,12 +79,17 @@ window.LoadMaintTaskList=function(){setTimeout(()=>{(window.__PENDING||[]).forEa
   await p.waitForFunction(() => !document.getElementById('ktma-md') && /CV/.test((document.getElementById('ktma-toast') || {}).textContent || '') && !/Đang soát/.test(document.getElementById('ktma-st').textContent), null, { timeout: 40000 });
   ok(await p.evaluate(() => window.__ROWS.filter(r => r.Description === 'Thay bóng đường Lê Duẫn').length === 59 && window.__ROWS[0].Description === 'Thay bóng đường Lê Duẩn'), 'hoàn tác ghi lại mô tả cũ, bỏ qua CV khoá');
   ok(!(await p.isVisible('[data-r=undo]')), 'hoàn tác xong ẩn nút');
-  // Máy chủ từ chối 1 lô
-  await p.evaluate(() => { window.__CALLS = []; window.__FAIL_ON = 1; });
+  // Máy chủ từ chối cả lô vì 1 CV thiếu thông tin Trụ → ghi lại từng CV
+  await p.evaluate(() => { window.__CALLS = []; window.__BAD = [window.__ROWS[3].Id]; });
   await p.click('[data-r=write]'); await p.waitForSelector('#ktma-md [data-w=go]');
   await Promise.all([p.waitForEvent('download'), p.click('#ktma-md [data-w=go]')]);
-  await p.waitForFunction(() => /LỖI|Đã ghi/.test(document.getElementById('ktma-st').textContent), null, { timeout: 40000 });
-  const t3 = await p.textContent('#ktma-st'); ok(/LỖI Lô 1: Từ chối giả lập/.test(t3) && /Đã ghi 9\/59 CV/.test(t3), 'lô bị từ chối được báo rõ: ' + t3.slice(0, 140));
+  await p.waitForFunction(() => /bị máy chủ từ chối|Đã ghi/.test(document.getElementById('ktma-st').textContent) && !/Đang/.test(document.getElementById('ktma-st').textContent), null, { timeout: 60000 });
+  const t3 = await p.textContent('#ktma-st'); const bad = await p.evaluate(() => window.__ROWS[3].Id);
+  ok(/Đã ghi 58\/59 CV/.test(t3) && /1 CV bị máy chủ từ chối/.test(t3), 'lô bị từ chối → ghi lại từng CV, chỉ CV lỗi không ghi: ' + t3.slice(0, 120));
+  ok(new RegExp('1 CV không ghi được — cần cung cấp thông tin Trụ \\(CV ' + bad + '\\)').test(t3), 'báo rõ lý do + mã CV, bỏ thẻ HTML: ' + t3.slice(0, 260));
+  ok(!(await p.evaluate(() => window.__XSS)), 'thông báo máy chủ không chạy được mã');
+  ok(await p.evaluate(() => window.__ROWS[3].Description === 'Thay bóng đường Lê Duẫn' && window.__ROWS.filter(r => r.Description === 'Thay bóng đường Lê Duẩn').length === 58), 'CV hợp lệ đã đổi, CV lỗi giữ nguyên');
+  ok(await p.evaluate(() => window.__CALLS.length === 2 + 50), 'gọi: 2 lô + 50 lần ghi lẻ cho lô bị từ chối');
   // KVTT: không có cột ghi
   await p.click('[data-m=all]'); await p.click('[data-a=run]'); await p.waitForTimeout(800);
   ok(!(await p.$('#ktma-res input[data-sel]')) && !(await p.$('#ktma-wbar')), 'chế độ Toàn KVTT không có chức năng ghi');
