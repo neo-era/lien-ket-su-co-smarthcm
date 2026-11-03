@@ -303,20 +303,29 @@ var KTCORE = (function () {
   function defaultSel(it) { return !!it && it.issues.some(function (i) { return i.on && i.kind === 'L'; }); }
   function editable(r) { return r && Number(r.StatusId) === 0; }
   // items: danh sách chính tả (có .sel); rows: dữ liệu lưới MỚI NHẤT
-  function writePlan(items, rows) {
+  // rejected: { Id: {msg, pole} } — CV máy chủ đã từ chối; bỏ qua khi Trụ của CV chưa đổi
+  function poleOf(r) { return r && r.PoleId != null && r.PoleId !== '' ? r.PoleId : null; }
+  function isRejected(rejected, r) { var x = rejected && own(rejected, String(r.Id)); return !!x && x.pole === poleOf(r); }
+  function writePlan(items, rows, rejected) {
     var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; }));
-    var out = { entries: [], locked: [], changed: [], missing: [] };
+    var out = { entries: [], locked: [], changed: [], missing: [], rejected: [] };
     (items || []).forEach(function (it) {
       if (!it.sel) return; var nv = cleanNew(it.de); if (!nv || nv === it.s) return;
       it.ids.forEach(function (id) {
         var r = by.get(String(id)); if (!r) { out.missing.push(id); return; }
         if (normDesc(r.Description) !== it.s) { out.changed.push(r.Id); return; }
         if (!editable(r)) { out.locked.push(r.Id); return; }
-        out.entries.push({ Id: r.Id, StatusId: r.StatusId, CompletedQuantity: r.CompletedQuantity, CabinetId: r.CabinetId, old: str(r.Description), new: nv });
+        if (isRejected(rejected, r)) { out.rejected.push(r.Id); return; }
+        out.entries.push({ Id: r.Id, StatusId: r.StatusId, CompletedQuantity: r.CompletedQuantity, CabinetId: r.CabinetId, PoleId: poleOf(r), old: str(r.Description), new: nv });
       });
     });
     return out;
   }
+  function rejectedCount(it, rows, rejected) { var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; })); return it.ids.filter(function (id) { var r = by.get(String(id)); return r && editable(r) && isRejected(rejected, r); }).length; }
+  // Gửi thêm PoleId hiện có (không đổi) — dùng khi máy chủ báo "cần cung cấp thông tin Trụ"
+  function toMaintTaskPole(e) { var o = toMaintTask(e); if (e.PoleId != null) o.PoleId = e.PoleId; return o; }
+  function needPole(msg) { return /thông tin\s*trụ/i.test(str(msg)); }
+  function parseRejected(txt) { var o; try { o = typeof txt === 'string' ? JSON.parse(txt) : txt; } catch (e) { return dict(); } var out = dict(); if (!isObj(o)) return out; Object.keys(o).forEach(function (k) { var v = o[k]; if (isObj(v) && typeof v.msg === 'string') out[k] = { msg: v.msg.slice(0, 300), pole: v.pole == null ? null : v.pole, at: str(v.at).slice(0, 30) }; }); return out; }
   function lockedCount(it, rows) { var by = new Map((rows || []).map(function (r) { return [String(r.Id), r]; })); return it.ids.filter(function (id) { return !editable(by.get(String(id))); }).length; }
   function toMaintTask(e) { return { Id: e.Id, StatusId: e.StatusId, CompletedQuantity: e.CompletedQuantity, Description: e.new, CabinetId: e.CabinetId, __type: 'LBCS.Core.MaintTask' }; }
   function chunk(a, n) { var o = []; for (var i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; }
@@ -344,6 +353,6 @@ var KTCORE = (function () {
     bd: bd, lev: lev, buildChecker: buildChecker, EXTRA: EXTRA, spellList: spellList, emptyLearn: emptyLearn, parseLearn: parseLearn,
     serializeLearn: serializeLearn, learnFromCommit: learnFromCommit, pendingCount: pendingCount, learnSummary: learnSummary, forget: forget, mergeLearn: mergeLearn, verdict: verdict,
     hint: hint, COMMON: COMMON, KL: KL, buildExport: buildExport, slug: slug, validKq: validKq,
-    normDesc: normDesc, defaultSel: defaultSel, editable: editable, writePlan: writePlan, lockedCount: lockedCount, toMaintTask: toMaintTask, chunk: chunk, verifyWrite: verifyWrite, writeLog: writeLog, undoPlan: undoPlan };
+    normDesc: normDesc, defaultSel: defaultSel, editable: editable, writePlan: writePlan, lockedCount: lockedCount, toMaintTask: toMaintTask, toMaintTaskPole: toMaintTaskPole, needPole: needPole, parseRejected: parseRejected, rejectedCount: rejectedCount, poleOf: poleOf, chunk: chunk, verifyWrite: verifyWrite, writeLog: writeLog, undoPlan: undoPlan };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = KTCORE;

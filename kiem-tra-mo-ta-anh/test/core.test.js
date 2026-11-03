@@ -204,5 +204,20 @@ ok(C.validKq({ a: 5, b: { kl: 'KHỚP' }, c: { kl: 'X' } }).b && !C.validKq({ a:
   const lg = C.writeLog(plan.entries, { quan: 'Quận 1', at: '2026-11-02T09:15:00' }); ok(lg.v === 1 && lg.entries.length === 3 && lg.quan === 'Quận 1', 'nhật ký ghi có đủ thông tin');
 }
 
+// ---------- v1.1.2: CV bị máy chủ từ chối (cần thông tin Trụ) ----------
+{ const R3 = (id, d, pole) => ({ Id: id, Description: d, StatusId: 0, CompletedQuantity: 1, CabinetId: 5, PoleId: pole, Cabinet: {} });
+  const rr = [R3(11, 'Thay bóng đường Lê Duẫn', null), R3(12, 'Thay bóng đường Lê Duẫn', 900), R3(13, 'Thay bóng đường Lê Duẫn', null)];
+  const spR = C.spellList(rr, C.emptyLearn()); spR.items[0].sel = true;
+  const rej = C.parseRejected(JSON.stringify({ 11: { msg: 'cần cung cấp thông tin Trụ', pole: null }, 12: { msg: 'cần cung cấp thông tin Trụ', pole: null }, x: 5 }));
+  const pl = C.writePlan(spR.items, rr, rej);
+  eq(pl.rejected.join(), '11', 'CV đã bị từ chối, Trụ chưa đổi → bỏ qua');
+  eq(pl.entries.map(e => e.Id).join(), '12,13', 'CV đã được gắn Trụ sau khi bị từ chối → ghi lại');
+  eq(C.rejectedCount(spR.items[0], rr, rej), 1, 'đếm CV bị từ chối của mô tả');
+  eq(pl.entries[0].PoleId, 900, 'kế hoạch giữ PoleId hiện có');
+  eq(Object.keys(C.toMaintTask(pl.entries[0])).includes('PoleId'), false, 'lần ghi đầu gửi đúng 6 trường như trang');
+  eq(C.toMaintTaskPole(pl.entries[0]).PoleId, 900, 'ghi lại khi thiếu Trụ: gửi kèm PoleId hiện có');
+  ok(C.needPole('Công việc mã 1: cần cung cấp thông tin Trụ') && !C.needPole('Lỗi khác'), 'nhận diện lỗi thiếu Trụ');
+  eq(Object.keys(C.parseRejected('{hỏng')).length, 0, 'bộ nhớ từ chối hỏng → rỗng'); }
+
 console.log('core: ' + pass + ' pass, ' + fail + ' fail'); fails.forEach(f => console.log('  ✗ ' + f));
 process.exit(fail ? 1 : 0);

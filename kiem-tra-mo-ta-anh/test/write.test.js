@@ -17,6 +17,7 @@ window.gridOptions={api:{forEachNode:f=>window.__ROWS.forEach(d=>f({data:d})),ge
 window.LBCS={Core:{MaintTask:function(){}},Service:{MaintenanceSvc:{ListMaintTaskNew:(f,ok)=>ok(Object.keys(f.Districts)[0]==='1'?JSON.parse(JSON.stringify(window.__ROWS)):[]),
  SaveReviewMaintTask:(rows,flag,ok,er)=>{window.__CALLS.push({n:rows.length,flag,keys:Object.keys(rows[0]).sort().join(),ctor:rows[0] instanceof LBCS.Core.MaintTask,rows:JSON.parse(JSON.stringify(rows))});
    if(window.__FAIL_ON&&window.__CALLS.length===window.__FAIL_ON){setTimeout(()=>ok({Code:0,Message:'Từ chối giả lập'}),10);return;}
+   const np=rows.find(r=>(window.__NEEDPOLE||[]).includes(r.Id)&&r.PoleId==null);if(np){setTimeout(()=>ok({Code:0,Message:'Công việc mã '+np.Id+': cần cung cấp thông tin Trụ<br />'}),10);return;}
    const bad=rows.find(r=>(window.__BAD||[]).includes(r.Id));if(bad){setTimeout(()=>ok({Code:0,Message:'Công việc mã '+bad.Id+': cần cung cấp thông tin Trụ<br /><img src=x onerror="window.__XSS=1">'}),10);return;}
    window.__PENDING=(window.__PENDING||[]).concat(rows);setTimeout(()=>ok({Code:1}),10);}}}};
 window.LoadMaintTaskList=function(){setTimeout(()=>{(window.__PENDING||[]).forEach(t=>{const r=window.__ROWS.find(x=>x.Id===t.Id);if(r)r.Description=t.Description;});window.__PENDING=[];window.__LOADS=(window.__LOADS||0)+1;},300);};
@@ -90,6 +91,21 @@ window.LoadMaintTaskList=function(){setTimeout(()=>{(window.__PENDING||[]).forEa
   ok(!(await p.evaluate(() => window.__XSS)), 'thông báo máy chủ không chạy được mã');
   ok(await p.evaluate(() => window.__ROWS[3].Description === 'Thay bóng đường Lê Duẫn' && window.__ROWS.filter(r => r.Description === 'Thay bóng đường Lê Duẩn').length === 58), 'CV hợp lệ đã đổi, CV lỗi giữ nguyên');
   ok(await p.evaluate(() => window.__CALLS.length === 2 + 50), 'gọi: 2 lô + 50 lần ghi lẻ cho lô bị từ chối');
+  // v1.1.2: lần chạy sau CV bị từ chối (chưa gắn Trụ) tự loại, có nhãn; gắn Trụ xong thì ghi lại được
+  await p.click('[data-a=run]'); await p.waitForTimeout(500); await p.click('[data-tab=ct]');
+  ok(/🚫 1 cần gắn Trụ/.test(await p.textContent('#ktma-res .body')), 'nhãn 🚫 cần gắn Trụ');
+  let bar2 = await p.textContent('#ktma-wbar'); ok(/0 CV sẽ ghi/.test(bar2) && await p.isDisabled('[data-r=write]'), 'CV còn lại cần gắn Trụ → không đếm, nút ghi tắt: ' + bar2);
+  ok(await (await p.$('tr:has(td:text-is("Thay bóng đường Lê Duẫn")) input[data-sel]')).isDisabled(), 'ô chọn tắt khi mọi CV khoá/cần gắn Trụ');
+  // Đơn vị gắn Trụ cho CV đó → công cụ tự cho ghi lại; máy chủ chỉ nhận khi gửi kèm PoleId
+  await p.evaluate(() => { window.__ROWS[3].PoleId = 555; window.__BAD = []; window.__NEEDPOLE = [window.__ROWS[3].Id]; window.__CALLS = []; });
+  await p.click('[data-a=run]'); await p.waitForTimeout(500); await p.click('[data-tab=ct]');
+  ok(!/cần gắn Trụ/.test(await p.textContent('#ktma-res .body')), 'gắn Trụ xong → bỏ nhãn 🚫');
+  await p.click('[data-r=write]'); await p.waitForSelector('#ktma-md [data-w=go]');
+  await Promise.all([p.waitForEvent('download'), p.click('#ktma-md [data-w=go]')]);
+  await p.waitForFunction(() => /Đã ghi/.test(document.getElementById('ktma-st').textContent) && !/Đang/.test(document.getElementById('ktma-st').textContent), null, { timeout: 60000 });
+  const c4 = await p.evaluate(() => window.__CALLS.map(c => c.rows.map(r => 'PoleId' in r ? r.PoleId : '-').join('|')));
+  ok(/Đã ghi 1\/1 CV/.test(await p.textContent('#ktma-st')) && c4.length === 2 && c4[0] === '-' && c4[1] === '555', 'thiếu Trụ → thử lại kèm PoleId hiện có → ghi được: ' + c4.join(' / '));
+  ok(await p.evaluate(() => !JSON.parse(localStorage.getItem('ktma_reject_v1') || '{}')[window.__ROWS[3].Id]), 'ghi được thì xoá khỏi danh sách từ chối');
   // KVTT: không có cột ghi
   await p.click('[data-m=all]'); await p.click('[data-a=run]'); await p.waitForTimeout(800);
   ok(!(await p.$('#ktma-res input[data-sel]')) && !(await p.$('#ktma-wbar')), 'chế độ Toàn KVTT không có chức năng ghi');

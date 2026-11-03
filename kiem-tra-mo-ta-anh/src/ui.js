@@ -17,7 +17,7 @@
   function nf(n) { return Number(n || 0).toLocaleString('vi-VN'); }
 
   /* ---------- trạng thái ---------- */
-  var S = { sel: new Map(), written: {}, mode: 'cur', rows: [], quan: '', auto: [], sp: null, adds: [], day: '', days: [], list: [], kq: {}, idx: 0, learn: C.parseLearn(lsGet(LKEY)), range: '' };
+  var S = { rej: C.parseRejected(lsGet('ktma_reject_v1')), sel: new Map(), written: {}, mode: 'cur', rows: [], quan: '', auto: [], sp: null, adds: [], day: '', days: [], list: [], kq: {}, idx: 0, learn: C.parseLearn(lsGet(LKEY)), range: '' };
   function saveLearn() { lsSet(LKEY, C.serializeLearn(S.learn)); }
   function kqKey() { return 'ktma_kq_v1|' + S.quan + '|' + S.day; }
   function saveKq() { lsSet(kqKey(), JSON.stringify(S.kq)); }
@@ -225,11 +225,11 @@
       h = tools + (its.length ? '<table><thead><tr>' + (cw ? '<th title="Chọn để ghi vào SmartHCM">✍</th>' : '') + '<th>#</th><th>Mô tả gốc</th><th>Lỗi <span style="font-weight:400">(bấm để bỏ/bật — báo nhầm thì bỏ)</span></th><th>Đề xuất sửa <span style="font-weight:400">(bấm để sửa)</span></th><th>Số CV</th></tr></thead><tbody>'
         + its.map(function (it) {
           var ix = it._ix;
-          var lk = it._lk || 0, all = lk >= it.n, chg = C.normDesc(it.de) !== it.s && !!C.normDesc(it.de), wt = S.written[it.s];
-          var cb = cw ? '<td><input type="checkbox" data-sel="' + ix + '"' + (it.sel && !all && chg ? ' checked' : '') + (all || !chg ? ' disabled' : '') + ' aria-label="Chọn để ghi" title="' + (all ? 'Tất cả CV đã kiểm tra — trang khoá' : !chg ? 'Đề xuất giống mô tả gốc' : 'Chọn để ghi vào SmartHCM') + '"></td>' : '';
+          var lk = it._lk || 0, rj = it._rj || 0, all = lk + rj >= it.n, chg = C.normDesc(it.de) !== it.s && !!C.normDesc(it.de), wt = S.written[it.s];
+          var cb = cw ? '<td><input type="checkbox" data-sel="' + ix + '"' + (it.sel && !all && chg ? ' checked' : '') + (all || !chg ? ' disabled' : '') + ' aria-label="Chọn để ghi" title="' + (all ? (rj ? 'CV đã kiểm tra hoặc cần gắn Trụ trước' : 'Tất cả CV đã kiểm tra — trang khoá') : !chg ? 'Đề xuất giống mô tả gốc' : 'Chọn để ghi vào SmartHCM') + '"></td>' : '';
           return '<tr>' + cb + '<td>' + (ix + 1) + '</td><td>' + esc(it.s) + (wt ? '<span class="k-lr" style="color:#0f5132">✓ đã ghi ' + esc(wt) + '</span>' : '') + '</td><td>' + it.issues.map(function (i, j) {
             return '<span class="k-chip ' + (i.on ? 'k-' + i.kind : 'k-off') + '" data-i="' + ix + '" data-j="' + j + '" role="button" tabindex="0" title="Bấm để ' + (i.on ? 'bỏ (báo nhầm)' : 'bật lại') + '">' + esc(i.text) + '</span>' + (i.learned ? '<span class="k-lr">' + esc(i.learned) + '</span>' : '');
-          }).join('') + '</td><td><span class="k-de' + (it.de !== it.defDe ? ' ed' : '') + '" contenteditable="plaintext-only" data-de="' + ix + '" aria-label="Đề xuất sửa">' + esc(it.de) + '</span>' + (it.deLearned ? '<span class="k-lr">📚 đề xuất đã học</span>' : '') + '</td><td>' + it.n + (lk ? ' <span class="k-chip k-lk" title="CV đã kiểm tra — trang không cho sửa">🔒' + (all ? ' đã kiểm tra' : lk) + '</span>' : '') + '</td></tr>';
+          }).join('') + '</td><td><span class="k-de' + (it.de !== it.defDe ? ' ed' : '') + '" contenteditable="plaintext-only" data-de="' + ix + '" aria-label="Đề xuất sửa">' + esc(it.de) + '</span>' + (it.deLearned ? '<span class="k-lr">📚 đề xuất đã học</span>' : '') + '</td><td>' + it.n + (lk ? ' <span class="k-chip k-lk" title="CV đã kiểm tra — trang không cho sửa">🔒' + (lk >= it.n ? ' đã kiểm tra' : lk) + '</span>' : '') + (rj ? ' <span class="k-chip k-warn" title="SmartHCM từ chối: cần gắn Trụ cho CV trước. Gắn Trụ xong công cụ tự cho ghi lại.">🚫 ' + rj + ' cần gắn Trụ</span>' : '') + '</td></tr>';
         }).join('') + '</tbody></table>' : '<div class="k-empty">Không có mô tả bị báo lỗi 🎉</div>') + (cw ? wbar() : '');
     } else if (tab === 'kb') {
       var un = S.sp.unflag.filter(function (s) { return !f || s.toLowerCase().indexOf(f) >= 0; });
@@ -296,12 +296,12 @@
   function canWrite() { return S.mode === 'cur' && S.writable && !!svc(); }
   function applySel() {
     if (!S.sp) return;
-    S.sp.items.forEach(function (it) { it._lk = C.lockedCount(it, S.rows); it.sel = it._lk >= it.n ? false : (S.sel.has(it.s) ? S.sel.get(it.s) : C.defaultSel(it)); });
+    S.sp.items.forEach(function (it) { it._lk = C.lockedCount(it, S.rows); it._rj = C.rejectedCount(it, S.rows, S.rej); it.sel = it._lk + it._rj >= it.n ? false : (S.sel.has(it.s) ? S.sel.get(it.s) : C.defaultSel(it)); });
     var u = $('[data-r=undo]'); if (u) u.hidden = !(canWrite() && lastLog());
   }
   function selInfo() {
     var n = 0, cv = 0, lk = 0;
-    S.sp.items.forEach(function (it) { if (!it.sel) return; var nv = C.normDesc(it.de); if (!nv || nv === it.s) return; var l = it._lk || 0; if (l >= it.n) return; n++; cv += it.n - l; lk += l; });
+    S.sp.items.forEach(function (it) { if (!it.sel) return; var nv = C.normDesc(it.de); if (!nv || nv === it.s) return; var l = (it._lk || 0) + (it._rj || 0); if (l >= it.n) return; n++; cv += it.n - l; lk += (it._lk || 0); });
     return { n: n, cv: cv, lk: lk };
   }
   function wbar() { var i = selInfo(); return '<div class="k-wbar" id="ktma-wbar"><b>Đã chọn ' + i.n + ' mô tả · ' + i.cv + ' CV sẽ ghi</b>' + (i.lk ? '<span>(' + i.lk + ' CV đã kiểm tra bị khoá, bỏ qua)</span>' : '') + '<span style="flex:1"></span><button class="k-wr" data-r="write"' + (i.cv ? '' : ' disabled') + '>✍ Ghi vào SmartHCM (' + i.cv + ' CV)</button></div>'; }
@@ -313,7 +313,7 @@
   function modal(html) { var md = $('#ktma-md'); if (md) md.remove(); md = document.createElement('div'); md.id = 'ktma-md'; md.innerHTML = '<div class="box" role="dialog" aria-modal="true">' + html + '</div>'; root.appendChild(md); return md; }
   function planHtml(plan, title, btn) {
     var g = new Map(); plan.entries.forEach(function (e) { var k = C.normDesc(e.old) + '\u0000' + e.new; if (!g.has(k)) g.set(k, { o: C.normDesc(e.old), n: e.new, c: 0 }); g.get(k).c++; });
-    var notes = []; if (plan.locked.length) notes.push(plan.locked.length + ' CV đã kiểm tra (trang khoá) — bỏ qua'); if (plan.changed.length) notes.push(plan.changed.length + ' CV mô tả đã bị sửa từ lúc kiểm tra — bỏ qua'); if (plan.missing.length) notes.push(plan.missing.length + ' CV không còn trong lưới — bỏ qua');
+    var notes = []; if (plan.locked.length) notes.push(plan.locked.length + ' CV đã kiểm tra (trang khoá) — bỏ qua'); if (plan.changed.length) notes.push(plan.changed.length + ' CV mô tả đã bị sửa từ lúc kiểm tra — bỏ qua'); if (plan.missing.length) notes.push(plan.missing.length + ' CV không còn trong lưới — bỏ qua'); if (plan.rejected && plan.rejected.length) notes.push(plan.rejected.length + ' CV SmartHCM đã từ chối vì chưa gắn Trụ — bỏ qua (gắn Trụ xong sẽ tự ghi lại được)');
     return '<div class="top"><b>' + esc(title) + '</b><button class="k-gh" data-w="x" aria-label="Đóng">✕</button></div><div class="body">'
       + (g.size ? '<table><thead><tr><th style="width:70px">Số CV</th><th>Mô tả cũ → mô tả mới</th></tr></thead><tbody>' + Array.from(g.values()).map(function (x) { return '<tr><td>' + x.c + '</td><td><span class="k-old">' + esc(x.o) + '</span><br><span class="k-new">' + esc(x.n) + '</span></td></tr>'; }).join('') + '</tbody></table>' : '<div class="k-empty">Không còn CV nào ghi được.</div>')
       + (notes.length ? '<p class="k-st">⚠ ' + esc(notes.join(' · ')) + '</p>' : '')
@@ -323,7 +323,7 @@
   function openWrite() {
     if (!canWrite()) return;
     if (pendingGridEdits()) { toast('Lưới SmartHCM đang có chỉnh sửa tay chưa bấm Cập nhật — lưu hoặc huỷ trước khi ghi.'); return; }
-    var plan = C.writePlan(S.sp.items, freshGrid());
+    var plan = C.writePlan(S.sp.items, freshGrid(), S.rej);
     var md = modal(planHtml(plan, '✍ Xác nhận ghi vào SmartHCM — ' + S.quan, 'Ghi'));
     md.onclick = function (e) { if (e.target === md || e.target.closest('[data-w=x]')) { if (!S.busy) md.remove(); } else if (e.target.closest('[data-w=go]')) doWrite(plan, false); };
   }
@@ -334,12 +334,12 @@
     var md = modal(planHtml(plan, '↩ Hoàn tác lần ghi ' + (lg.at || '') + ' — ' + S.quan, 'Hoàn tác'));
     md.onclick = function (e) { if (e.target === md || e.target.closest('[data-w=x]')) { if (!S.busy) md.remove(); } else if (e.target.closest('[data-w=go]')) doWrite(plan, true); };
   }
-  function saveChunk(entries) {
+  function saveChunk(entries, withPole) {
     return new Promise(function (res) {
       var to = setTimeout(function () { res({ ok: false, msg: 'Hết thời gian chờ máy chủ' }); }, 60000);
       var done = function (v) { clearTimeout(to); res(v); };
       try {
-        var tasks = entries.map(function (e) { var o = C.toMaintTask(e), mt; try { mt = (window.LBCS && LBCS.Core && typeof LBCS.Core.MaintTask === 'function') ? new LBCS.Core.MaintTask() : {}; } catch (er) { mt = {}; } Object.keys(o).forEach(function (k) { mt[k] = o[k]; }); return mt; });
+        var tasks = entries.map(function (e) { var o = withPole ? C.toMaintTaskPole(e) : C.toMaintTask(e), mt; try { mt = (window.LBCS && LBCS.Core && typeof LBCS.Core.MaintTask === 'function') ? new LBCS.Core.MaintTask() : {}; } catch (er) { mt = {}; } Object.keys(o).forEach(function (k) { mt[k] = o[k]; }); return mt; });
         svc().SaveReviewMaintTask(tasks, false, function (d) { done(d && d.Code === 1 ? { ok: true } : { ok: false, msg: (d && d.Message) || 'Máy chủ từ chối' }); }, function (er) { done({ ok: false, msg: (er && (er._message || er.message)) || 'Lỗi kết nối' }); });
       } catch (er) { done({ ok: false, msg: String(er && er.message || er) }); }
     });
@@ -361,13 +361,17 @@
       if (st) st.textContent = 'Đang ghi lô ' + (i + 1) + '/' + parts.length + '…';
       var r = await saveChunk(parts[i]);
       if (r.ok) { okE = okE.concat(parts[i]); continue; }
-      if (parts[i].length === 1) { errs.push({ id: parts[i][0].Id, msg: cleanMsg(r.msg) }); continue; }
       // Máy chủ từ chối cả lô khi chỉ 1 CV không hợp lệ → ghi lại từng CV để các CV hợp lệ vẫn được lưu
       for (var j = 0; j < parts[i].length; j++) {
+        var e1 = parts[i][j];
         if (st) st.textContent = 'Lô ' + (i + 1) + ' bị từ chối — ghi lại từng CV (' + (j + 1) + '/' + parts[i].length + ')…';
-        var r1 = await saveChunk([parts[i][j]]);
-        if (r1.ok) okE.push(parts[i][j]); else errs.push({ id: parts[i][j].Id, msg: cleanMsg(r1.msg) });
+        var r1 = parts[i].length === 1 ? r : await saveChunk([e1]);
+        if (!r1.ok && C.needPole(cleanMsg(r1.msg)) && e1.PoleId != null) r1 = await saveChunk([e1], true);   // thử gửi kèm Trụ hiện có
+        if (r1.ok) { okE.push(e1); delete S.rej[String(e1.Id)]; continue; }
+        var m1 = cleanMsg(r1.msg); errs.push({ id: e1.Id, msg: m1 });
+        if (C.needPole(m1)) S.rej[String(e1.Id)] = { msg: m1, pole: e1.PoleId == null ? null : e1.PoleId, at: at };
       }
+      lsSet('ktma_reject_v1', JSON.stringify(S.rej));
     }
     if (st) st.textContent = 'Đang tải lại lưới và kiểm lại…';
     var v = await waitGrid(okE);
