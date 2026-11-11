@@ -110,7 +110,7 @@ Công cụ **ghi nhớ cách bạn sửa** và tự áp dụng cho lần sau —
 3. Công cụ tự lấy dữ liệu 8 quận, lọc theo ngày ghi nhận, tải `BaoCao-DuyTu-KVTT-YYYYMMDD.doc`:
    bảng tổng theo quận → mỗi quận có bảng hạng mục + danh sách chi tiết → dòng ký Giám đốc CSKVTT.
 
-## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.1.0)
+## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.2.0)
 
 ![Bảng chính tả](docs/kiemtra-bang.png)
 
@@ -149,7 +149,20 @@ Công cụ không tự sửa gì trên hệ thống. Nút **📚 Đã học** xe
 - Không cho ghi khi lưới đang có chỉnh sửa tay chưa bấm "Cập nhật"; CV bị người khác sửa trong lúc duyệt thì bỏ qua và báo lại.
 - Chế độ **Toàn KVTT** chỉ đọc. Không bao giờ Duyệt/Xoá/Kiểm tra công việc.
 
-Mã nguồn có test tự động trong [`kiem-tra-mo-ta-anh/`](kiem-tra-mo-ta-anh/) (`node build.js`, `node test/core.test.js`, `node test/xlsx.test.js`, `node test/ui.test.js`).
+### 5.2. Sửa từng CV trong hộp "Chi tiết công việc" (v1.2.0)
+
+Dùng cho CV cần sửa kỹ hoặc **CV SmartHCM báo "cần cung cấp thông tin Trụ"** (🚫 cần gắn Trụ).
+
+1. Ở tab **Chính tả**, cột Số CV có nút **✎ Sửa**. Mô tả có nhiều CV → hiện danh sách để chọn CV (CV đã kiểm tra bị khoá 🔒).
+2. Công cụ mở **đúng hộp "Chi tiết công việc" của trang** (như nhấp đúp dòng), **điền sẵn Mô tả** bằng đề xuất (viền cam) và tạm ẩn bảng kết quả + panel các công cụ để không che hộp.
+3. Anh xem lại Mô tả, **chọn Trụ** nếu cần → bấm **Lưu dữ liệu** của trang. Bấm **Đóng** nếu không muốn lưu.
+4. Đóng hộp xong, bảng hiện lại và tự kiểm tra lại — dòng đã sửa biến mất.
+
+- Công cụ **không tự lưu** trong luồng này; chỉ trang lưu khi anh bấm "Lưu dữ liệu".
+- Nếu mô tả CV đã bị người khác sửa sau lần kiểm tra, công cụ **không điền đè** mà báo để anh xem trực tiếp.
+- Chỉ có ở chế độ *Quận đang lọc*, với tài khoản quản lý đơn vị (như luật của trang).
+
+Mã nguồn có test tự động trong [`kiem-tra-mo-ta-anh/`](kiem-tra-mo-ta-anh/) (`node build.js`, rồi `node test/core.test.js`, `xlsx`, `ui`, `write`, `detail`).
 
 ## 6. Khắc phục sự cố
 

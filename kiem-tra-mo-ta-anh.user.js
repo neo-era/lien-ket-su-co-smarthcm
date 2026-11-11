@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kiểm tra mô tả & ảnh duy tu - SmartHCM
 // @namespace    lavipco.cskvtt
-// @version      1.1.2
+// @version      1.2.0
 // @description  Soát chính tả cột Mô tả (có tự học), kiểm tra dữ liệu ảnh tự động, xem ảnh nhanh để kết luận Khớp/Không khớp, xuất Excel. Có chức năng ghi mô tả đã sửa vào SmartHCM (chỉ dòng người dùng chọn, có xác nhận, nhật ký và hoàn tác). Chạy trên smarthcm.city.
 // @author       CSKVTT - LAVIPCO
 // @match        https://smarthcm.city/*
@@ -20,7 +20,7 @@
  */
 (function () {
 'use strict';
-var KT_VERSION = "1.1.2";
+var KT_VERSION = "1.2.0";
 // ===== LÕI kiểm tra mô tả & ảnh duy tu (thuần, không DOM) — dùng chung userscript & test Node =====
 var KTCORE = (function () {
   'use strict';
@@ -176,7 +176,7 @@ var KTCORE = (function () {
       // Viết tắt trụ — bỏ qua chỗ nằm trong tên đường ("nguyen cong tru 5")
       var inName = function (st, en) { return claimed.some(function (c) { return st < c.en && en > c.st; }); };
       TR_RE.lastIndex = 0; var tr;
-      while ((tr = TR_RE.exec(s))) { if (/^trụ/i.test(tr[0]) || inName(tr.index, tr.index + tr[1].length)) continue; add('L', 'tr|' + s0, '"' + tr[0] + '" → "trụ số ' + tr[3] + '"'); break; }
+      while ((tr = TR_RE.exec(s))) { if (/^trụ/i.test(tr[0]) || inName(tr.index, tr.index + tr[1].length)) continue; add('L', 'tr|' + s0, '"' + tr[0] + '" → "' + (/^\p{Lu}/u.test(tr[0]) ? 'Trụ' : 'trụ') + ' số ' + tr[3] + '"'); break; }
       if (/(?<![\p{L}\p{N}])p\.?\s*\d+(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])p\.?\s+\p{Ll}/iu.test(s) && !/(?<![\p{L}\p{N}])P\.\s?\p{Lu}/u.test(s)) add('C', 'p|' + s0, 'Viết tắt "p" → "phường"');
       var s2 = s.replace(/\d[.,]\d/g, '').replace(/(?<![\p{L}\p{N}])(?:TP|Tp|tp|Q|q|P|p)\.(?=\S)/gu, '').replace(/\.{2,}|…/g, '');
       if (/[.,;:][^\s\d)\/µ]/u.test(s2)) add('C', 'sp1|' + s0, 'Thiếu khoảng trắng sau dấu câu');
@@ -190,7 +190,7 @@ var KTCORE = (function () {
         var rep = (c.key && !off.has(c.key)) ? c.nv : c.orig; ph.push(rep);
         de = de.slice(0, c.st) + '\u0002' + (ph.length - 1) + '\u0003' + de.slice(c.en);
       });
-      if (on('tr|' + s0)) de = de.replace(TR_RE, function (m0, w, so, n) { return /^trụ/i.test(m0) ? m0 : 'trụ số ' + n; });
+      if (on('tr|' + s0)) de = de.replace(TR_RE, function (m0, w, so, n) { return /^trụ/i.test(m0) ? m0 : (/^\p{Lu}/u.test(m0) ? 'Trụ số ' : 'trụ số ') + n; });
       if (on('p|' + s0)) de = de.replace(/(?<![\p{L}\p{N}\u0003])p\.?\s*(?=\d)/giu, 'phường ').replace(/(?<![\p{L}\p{N}\u0003])p\.?\s+(?=[\p{L}\u0002])/giu, 'phường ');
       de = de.replace(/\u0002(\d+)\u0003/g, function (m0, i) { return ph[+i]; });
       de = de.replace(/(?<![\p{L}\p{N}])(TP|Tp|tp|Q|q)\.(?=\S)/gu, function (m0, a) { return a + '\u0001'; });
@@ -198,7 +198,7 @@ var KTCORE = (function () {
       if (on('eq|' + s0)) de = de.replace(/\s*=\s*/g, ' ');
       if (on('sp2|' + s0) || (on('sp1|' + s0) && !off.has('sp2|' + s0))) de = de.replace(/(\p{L})\(/gu, function (m0, a) { return a + ' ('; }).replace(/\(\s+/g, '(').replace(/\s+([.,;:)])/g, function (m0, a) { return a; });
       if (on('sp1|' + s0)) de = de.replace(/([.,;:])(?=[^\s\d)\/µ.\u0001])/g, function (m0, a) { return a + ' '; });
-      de = de.replace(/\s+/g, ' ').replace(/\u0001/g, '.').replace(/(?<![\p{L}\p{N}])trụ\s+trụ số/giu, 'trụ số').trim();
+      de = de.replace(/\s+/g, ' ').replace(/\u0001/g, '.').replace(/(?<![\p{L}\p{N}])(trụ)\s+trụ số/giu, function (m0, a) { return a + ' số'; }).trim();
       return { issues: I, de: de };
     };
   }
@@ -526,6 +526,10 @@ var KTXLSX = (function () {
     '.k-wr{background:#b45309;color:#fff}.k-lk{background:#e9ecef;color:#6c757d}.k-done{background:#d1e7dd;color:#0f5132}',
     '#ktma-root input[type=checkbox]{width:16px;height:16px;accent-color:#b45309;cursor:pointer}',
     '.k-old{color:#b02a37;text-decoration:line-through}.k-new{color:#198754;font-weight:600}',
+    '#ktma-root button.k-ed{padding:2px 8px;font-size:12px;margin-left:6px;white-space:nowrap}',
+    '#ktma-pop{position:fixed;z-index:2147483100;background:var(--k-bg);color:var(--k-txt);border:1px solid var(--k-line);border-radius:10px;box-shadow:var(--k-sh);padding:8px;max-height:320px;overflow:auto;min-width:260px}',
+    '#ktma-pop .t{font-size:12px;color:var(--k-mut);margin:0 4px 6px}#ktma-pop button{display:flex;width:100%;justify-content:space-between;gap:8px;margin:2px 0;padding:6px 10px;background:var(--k-bg2);color:var(--k-txt)}',
+    '#ktma-root.k-hold #ktma-res,#ktma-root.k-hold #ktma-pn,body.ktma-hold #lksc,body.ktma-hold #bcdt{display:none!important}',
     '#ktma-rv{position:fixed;inset:0;z-index:2147483600;background:#0f141b;color:#e5e7eb;display:flex;flex-direction:column}',
     '#ktma-rv .rh{padding:10px 16px;display:grid;grid-template-columns:1fr auto;gap:8px;border-bottom:1px solid #263040;line-height:1.45}',
     '#ktma-rv .im{flex:1;display:flex;gap:8px;padding:8px;min-height:0}#ktma-rv .im figure{flex:1;margin:0;min-width:0;display:flex;flex-direction:column;background:#000;border-radius:8px;overflow:hidden;cursor:zoom-in}',
@@ -557,7 +561,7 @@ var KTXLSX = (function () {
     + '<div class="k-day"><span>Ngày xem ảnh</span><input type="date" id="ktma-day" disabled aria-label="Ngày xem ảnh"></div>'
     + '<div class="k-row2"><button class="k-acc" data-a="review" disabled>2) Xem ảnh</button><button class="k-gh" data-a="xlsx" disabled>3) Xuất Excel</button></div>'
     + '<div class="k-links"><a data-a="res">Bảng kết quả</a><a data-a="learn">📚 Đã học (<span id="ktma-nl">0</span>)</a><a data-a="fb">Góp ý</a><span style="margin-left:auto;color:var(--k-mut)">v' + esc(VER) + '</span></div>'
-    + '<div class="k-st" id="ktma-st">Lọc quận + khoảng thời gian trên trang rồi bấm "Chạy kiểm tra". Công cụ chỉ đọc, không sửa dữ liệu.</div></div>';
+    + '<div class="k-st" id="ktma-st">Lọc quận + khoảng thời gian trên trang rồi bấm "Chạy kiểm tra". Công cụ chỉ ghi mô tả khi anh chọn và xác nhận.</div></div>';
   root.appendChild(pn);
   function stat(t) { $('#ktma-st').textContent = t; }
   function nLearn() { $('#ktma-nl').textContent = C.learnSummary(S.learn).length; }
@@ -694,7 +698,7 @@ var KTXLSX = (function () {
           var cb = cw ? '<td><input type="checkbox" data-sel="' + ix + '"' + (it.sel && !all && chg ? ' checked' : '') + (all || !chg ? ' disabled' : '') + ' aria-label="Chọn để ghi" title="' + (all ? (rj ? 'CV đã kiểm tra hoặc cần gắn Trụ trước' : 'Tất cả CV đã kiểm tra — trang khoá') : !chg ? 'Đề xuất giống mô tả gốc' : 'Chọn để ghi vào SmartHCM') + '"></td>' : '';
           return '<tr>' + cb + '<td>' + (ix + 1) + '</td><td>' + esc(it.s) + (wt ? '<span class="k-lr" style="color:#0f5132">✓ đã ghi ' + esc(wt) + '</span>' : '') + '</td><td>' + it.issues.map(function (i, j) {
             return '<span class="k-chip ' + (i.on ? 'k-' + i.kind : 'k-off') + '" data-i="' + ix + '" data-j="' + j + '" role="button" tabindex="0" title="Bấm để ' + (i.on ? 'bỏ (báo nhầm)' : 'bật lại') + '">' + esc(i.text) + '</span>' + (i.learned ? '<span class="k-lr">' + esc(i.learned) + '</span>' : '');
-          }).join('') + '</td><td><span class="k-de' + (it.de !== it.defDe ? ' ed' : '') + '" contenteditable="plaintext-only" data-de="' + ix + '" aria-label="Đề xuất sửa">' + esc(it.de) + '</span>' + (it.deLearned ? '<span class="k-lr">📚 đề xuất đã học</span>' : '') + '</td><td>' + it.n + (lk ? ' <span class="k-chip k-lk" title="CV đã kiểm tra — trang không cho sửa">🔒' + (lk >= it.n ? ' đã kiểm tra' : lk) + '</span>' : '') + (rj ? ' <span class="k-chip k-warn" title="SmartHCM từ chối: cần gắn Trụ cho CV trước. Gắn Trụ xong công cụ tự cho ghi lại.">🚫 ' + rj + ' cần gắn Trụ</span>' : '') + '</td></tr>';
+          }).join('') + '</td><td><span class="k-de' + (it.de !== it.defDe ? ' ed' : '') + '" contenteditable="plaintext-only" data-de="' + ix + '" aria-label="Đề xuất sửa">' + esc(it.de) + '</span>' + (it.deLearned ? '<span class="k-lr">📚 đề xuất đã học</span>' : '') + '</td><td>' + it.n + (lk ? ' <span class="k-chip k-lk" title="CV đã kiểm tra — trang không cho sửa">🔒' + (lk >= it.n ? ' đã kiểm tra' : lk) + '</span>' : '') + (rj ? ' <span class="k-chip k-warn" title="SmartHCM từ chối: cần gắn Trụ cho CV trước. Gắn Trụ xong công cụ tự cho ghi lại.">🚫 ' + rj + ' cần gắn Trụ</span>' : '') + (canOpen() ? '<button class="k-gh k-ed" data-ed="' + ix + '" title="Mở hộp Chi tiết công việc của SmartHCM, điền sẵn đề xuất — sửa Mô tả, chọn Trụ rồi bấm Lưu dữ liệu">✎ Sửa</button>' : '') + '</td></tr>';
         }).join('') + '</tbody></table>' : '<div class="k-empty">Không có mô tả bị báo lỗi 🎉</div>') + (cw ? wbar() : '');
     } else if (tab === 'kb') {
       var un = S.sp.unflag.filter(function (s) { return !f || s.toLowerCase().indexOf(f) >= 0; });
@@ -724,6 +728,7 @@ var KTXLSX = (function () {
     var t = e.target;
     var tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; renderRes(); return; }
     var ch = t.closest('.k-chip[data-i]'); if (ch) { var it = S.sp.items[+ch.dataset.i], is = it.issues[+ch.dataset.j]; is.on = !is.on; if (!it.deLearned) recomputeDe(it); if (!S.sel.has(it.s)) it.sel = C.defaultSel(it); renderRes(); kpis(); return; }
+    var eb = t.closest('[data-ed]'); if (eb) { var it3 = S.sp.items[+eb.dataset.ed]; if (it3.ids.length === 1) openDetail(it3.ids[0], it3.de, it3.s); else showPick(eb, it3); return; }
     var sb = t.closest('[data-sel]'); if (sb) { var it2 = S.sp.items[+sb.dataset.sel]; it2.sel = sb.checked; S.sel.set(it2.s, sb.checked); updWbar(); return; }
     var rv = t.closest('[data-rv]'); if (rv) { openReview(+rv.dataset.rv); return; }
     var ad = t.closest('[data-add]'); if (ad) { addErr(ad.dataset.add); return; }
@@ -852,6 +857,71 @@ var KTXLSX = (function () {
     toast(msg); stat(msg + (detail ? '\n⚠ ' + detail : '') + (v.fail.length ? '\nCV cần kiểm lại: ' + v.fail.slice(0, 30).join(', ') : ''));
   }
 
+  /* ---------- SỬA TRONG HỘP "CHI TIẾT CÔNG VIỆC" CỦA TRANG ---------- */
+  function canOpen() { try { return S.mode === 'cur' && S.writable && typeof window.LoadMaintTaskDetail === 'function' && window.isUnitManager === true && !!document.getElementById('MaintTaskDetailEdit'); } catch (e) { return false; } }
+  function liveNode(id) { var g = window.gridOptions, f = null; try { g.api.forEachNode(function (n) { if (!f && n.data && String(n.data.Id) === String(id)) f = n.data; }); } catch (e) { } return f; }
+  function rowById(id) { return S.rows.find(function (r) { return String(r.Id) === String(id); }); }
+  function closePick() { var o = $('#ktma-pop'); if (o) o.remove(); document.removeEventListener('mousedown', pickOut, true); document.removeEventListener('keydown', pickKey, true); }
+  function pickKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closePick(); } }
+  function pickOut(e) { if (!e.target.closest('#ktma-pop')) closePick(); }
+  function showPick(btn, it) {
+    closePick();
+    var pop = document.createElement('div'); pop.id = 'ktma-pop'; pop.setAttribute('role', 'menu');
+    pop.innerHTML = '<div class="t">Chọn CV để mở hộp Chi tiết công việc</div>' + it.ids.slice(0, 200).map(function (id) {
+      var r = rowById(id) || {}, lk = !C.editable(r), rj = !lk && S.rej[String(id)];
+      return '<button data-cv="' + esc(id) + '"' + (lk ? ' disabled title="CV đã kiểm tra — trang không cho sửa"' : '') + '><span>#' + esc(id) + ' · ' + esc((r.Cabinet || {}).BoxName || '') + '</span><span>' + (lk ? '🔒' : rj ? '🚫 cần gắn Trụ' : '✎') + '</span></button>';
+    }).join('') + (it.ids.length > 200 ? '<div class="t">… còn ' + (it.ids.length - 200) + ' CV — lọc hẹp lại để mở</div>' : '');
+    root.appendChild(pop);
+    var rc = btn.getBoundingClientRect(); pop.style.top = Math.min(rc.bottom + 4, window.innerHeight - pop.offsetHeight - 8) + 'px'; pop.style.left = Math.max(8, Math.min(rc.right - pop.offsetWidth, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+    pop.onclick = function (e) { var b = e.target.closest('[data-cv]'); if (!b || b.disabled) return; closePick(); openDetail(b.dataset.cv, it.de, it.s); };
+    setTimeout(function () { document.addEventListener('mousedown', pickOut, true); document.addEventListener('keydown', pickKey, true); }, 0);
+  }
+  function modalOpen() { var m = document.getElementById('MaintTaskDetailEdit'); if (!m) return false; var cs = getComputedStyle(m); return cs.display !== 'none' && cs.visibility !== 'hidden' && m.offsetParent !== null || cs.display === 'block'; }
+  function sleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+  function hold(on) { root.classList.toggle('k-hold', on); document.body.classList.toggle('ktma-hold', on); }
+  async function openDetail(id, de, src) {
+    if (S.editing) { toast('Đang mở hộp Chi tiết công việc — xử lý xong CV đó trước.'); return; }
+    if (!canOpen()) { toast('Chỉ mở được hộp chi tiết ở chế độ "Quận đang lọc" với tài khoản quản lý đơn vị.'); return; }
+    var r = liveNode(id);
+    if (!r) { toast('Không thấy CV #' + id + ' trong lưới — chạy kiểm tra lại.'); return; }
+    if (!C.editable(r)) { toast('CV #' + id + ' đã kiểm tra — trang không cho sửa.'); return; }
+    if (modalOpen()) { toast('Hộp Chi tiết công việc đang mở — đóng hộp đó trước.'); return; }
+    var nv = C.normDesc(de), cur = C.normDesc(r.Description), fresh = src == null || cur === src;
+    S.editing = true; hold(true);
+    var d = null, oldDesc = r.Description;
+    try {
+      var mid = document.getElementById('txtMaintTaskId'); if (mid) mid.value = '';
+      try { window.currentMaintTask = r; window.currentMaintTaskId = r.Id; } catch (e) { }
+      window.LoadMaintTaskDetail(r.Id, 1, 0);
+      var ok = false, seen = 0;
+      for (var t = 0; t < 120; t++) {
+        await sleep(250); mid = document.getElementById('txtMaintTaskId'); d = document.getElementById('txtDescription');
+        if (modalOpen() && mid && String(mid.value) === String(r.Id) && d) {
+          if (C.normDesc(d.value) === cur || ++seen >= 6) { ok = true; break; }
+        }
+      }
+      if (!ok) { toast('Hộp chi tiết chưa mở được (trang phản hồi chậm hoặc báo lỗi).'); return; }
+      if (!fresh) toast('Mô tả CV #' + r.Id + ' đã đổi sau lần kiểm tra — công cụ KHÔNG điền sẵn, anh xem trực tiếp.');
+      else if (nv && !d.disabled && !d.readOnly) {
+        d.value = nv; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true }));
+        d.style.outline = '3px solid #f59f00'; d.title = 'Công cụ đã điền sẵn đề xuất sửa — kiểm tra lại rồi bấm "Lưu dữ liệu"';
+        setTimeout(function () { try { d.focus(); d.setSelectionRange(d.value.length, d.value.length); } catch (e) { } }, 300);
+      }
+      // Chờ người dùng đóng hộp (Lưu dữ liệu / Đóng), tối đa 2 giờ
+      for (var w = 0; w < 14400 && modalOpen(); w++) await sleep(500);
+    } catch (e) {
+      toast('Không mở được hộp chi tiết: ' + (e && e.message || e));
+    } finally {
+      if (d) { d.style.outline = ''; d.title = ''; }
+      hold(false); S.editing = false;
+    }
+    if (!ok) return;
+    // Chờ lưới tải lại (nếu đã lưu) rồi kiểm tra lại
+    await sleep(800);
+    for (var k = 0; k < 10; k++) { var n2 = liveNode(r.Id); if (!n2 || n2 !== r || n2.Description !== oldDesc) break; await sleep(500); }
+    if (S.mode === 'cur') await run(true);
+  }
+
   /* ---------- MÀN XEM ẢNH ---------- */
   var KLC = { 'KHỚP': '#198754', 'KHÔNG KHỚP': '#dc3545', 'CẦN XEM': '#f59f00', 'KHÔNG ĐỌC ĐƯỢC': '#6c757d' };
   var IMGS = [['Image1', 'Hiện trạng'], ['Image2', 'Thi công'], ['Image3', 'Hoàn thành'], ['ImageAddition', 'Bổ sung']];
@@ -975,7 +1045,7 @@ var KTXLSX = (function () {
     window.open('mailto:maivulam2020@gmail.com?subject=' + encodeURIComponent('[Góp ý] Kiểm tra mô tả & ảnh v' + VER) + '&body=' + encodeURIComponent(body));
   }
 
-  window.__ktma = { S: S, run: run, openWrite: openWrite, openUndo: openUndo, doWrite: doWrite, openRes: openRes, openReview: openReview, exportXlsx: exportXlsx, commit: commit, setDay: setDay, openLearn: openLearn };
+  window.__ktma = { S: S, run: run, openDetail: openDetail, openWrite: openWrite, openUndo: openUndo, doWrite: doWrite, openRes: openRes, openReview: openReview, exportXlsx: exportXlsx, commit: commit, setDay: setDay, openLearn: openLearn };
 })();
 
 })();

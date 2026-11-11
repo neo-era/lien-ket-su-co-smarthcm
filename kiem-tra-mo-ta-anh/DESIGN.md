@@ -28,13 +28,18 @@ trong repo `neo-era/lien-ket-su-co-smarthcm` (cùng 2 công cụ: Liên kết s�
    theo khoảng ngày đang lọc trên trang).
 8. Giao diện hiện đại, nhất quán 3 công cụ; có nút Góp ý (mailto, kèm phiên bản).
 
+10. (v1.2.0, chốt 11/11/2026) **✎ Sửa trong hộp "Chi tiết công việc" của trang**: gọi `LoadMaintTaskDetail(id,1,0)` (như nhấp đúp dòng),
+   điền sẵn `#txtDescription` bằng đề xuất (chỉ khi mô tả trên lưới chưa đổi từ lần kiểm tra), tạm ẩn bảng + panel 3 công cụ.
+   Người dùng tự chọn Trụ và bấm "Lưu dữ liệu" (`SaveMaintTaskDetail` gửi kèm PoleId) — công cụ **không tự lưu** trong luồng này.
+   Chỉ chế độ Quận đang lọc, tài khoản quản lý đơn vị, CV chưa kiểm tra. Có khoá chống mở chồng; lỗi/hết giờ luôn gỡ trạng thái ẩn.
+
 ## Kiến trúc
 - `src/core.js` (thuần, test Node): ngày, auto-check, chính tả (buildDict + check), tự học (key, learn, apply),
   hạng mục → gợi ý kiểm ảnh, tạo dữ liệu xuất.
 - `src/xlsx.js` (thuần): ghi .xlsx tối giản (zip store + CRC32, styles màu, freeze, autofilter, độ rộng cột).
 - `src/ui.js`: panel, bảng kết quả, lớp phủ xem ảnh, bảng Đã học (DOM).
 - `build.js`: ghép header + core + xlsx + ui → `kiem-tra-mo-ta-anh.user.js` (lõi chạy = lõi đã test).
-- Test: `test/core.test.js`, `test/xlsx.test.js` (mở lại bằng openpyxl), `test/ui.test.js`, `test/write.test.js` (Playwright, trang giả có gridOptions + LBCS giả).
+- Test: `test/core.test.js`, `test/xlsx.test.js` (mở lại bằng openpyxl), `test/ui.test.js`, `test/write.test.js`, `test/detail.test.js` (Playwright, trang giả có gridOptions + LBCS + hộp chi tiết giả).
 
 ## Rủi ro
 - Không vào được trang thật từ môi trường dev (Claude in Chrome lỗi kết nối) → kiểm chứng giao diện bằng trang giả;

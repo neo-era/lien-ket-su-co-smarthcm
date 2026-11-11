@@ -153,7 +153,7 @@ var KTCORE = (function () {
       // Viết tắt trụ — bỏ qua chỗ nằm trong tên đường ("nguyen cong tru 5")
       var inName = function (st, en) { return claimed.some(function (c) { return st < c.en && en > c.st; }); };
       TR_RE.lastIndex = 0; var tr;
-      while ((tr = TR_RE.exec(s))) { if (/^trụ/i.test(tr[0]) || inName(tr.index, tr.index + tr[1].length)) continue; add('L', 'tr|' + s0, '"' + tr[0] + '" → "trụ số ' + tr[3] + '"'); break; }
+      while ((tr = TR_RE.exec(s))) { if (/^trụ/i.test(tr[0]) || inName(tr.index, tr.index + tr[1].length)) continue; add('L', 'tr|' + s0, '"' + tr[0] + '" → "' + (/^\p{Lu}/u.test(tr[0]) ? 'Trụ' : 'trụ') + ' số ' + tr[3] + '"'); break; }
       if (/(?<![\p{L}\p{N}])p\.?\s*\d+(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])p\.?\s+\p{Ll}/iu.test(s) && !/(?<![\p{L}\p{N}])P\.\s?\p{Lu}/u.test(s)) add('C', 'p|' + s0, 'Viết tắt "p" → "phường"');
       var s2 = s.replace(/\d[.,]\d/g, '').replace(/(?<![\p{L}\p{N}])(?:TP|Tp|tp|Q|q|P|p)\.(?=\S)/gu, '').replace(/\.{2,}|…/g, '');
       if (/[.,;:][^\s\d)\/µ]/u.test(s2)) add('C', 'sp1|' + s0, 'Thiếu khoảng trắng sau dấu câu');
@@ -167,7 +167,7 @@ var KTCORE = (function () {
         var rep = (c.key && !off.has(c.key)) ? c.nv : c.orig; ph.push(rep);
         de = de.slice(0, c.st) + '\u0002' + (ph.length - 1) + '\u0003' + de.slice(c.en);
       });
-      if (on('tr|' + s0)) de = de.replace(TR_RE, function (m0, w, so, n) { return /^trụ/i.test(m0) ? m0 : 'trụ số ' + n; });
+      if (on('tr|' + s0)) de = de.replace(TR_RE, function (m0, w, so, n) { return /^trụ/i.test(m0) ? m0 : (/^\p{Lu}/u.test(m0) ? 'Trụ số ' : 'trụ số ') + n; });
       if (on('p|' + s0)) de = de.replace(/(?<![\p{L}\p{N}\u0003])p\.?\s*(?=\d)/giu, 'phường ').replace(/(?<![\p{L}\p{N}\u0003])p\.?\s+(?=[\p{L}\u0002])/giu, 'phường ');
       de = de.replace(/\u0002(\d+)\u0003/g, function (m0, i) { return ph[+i]; });
       de = de.replace(/(?<![\p{L}\p{N}])(TP|Tp|tp|Q|q)\.(?=\S)/gu, function (m0, a) { return a + '\u0001'; });
@@ -175,7 +175,7 @@ var KTCORE = (function () {
       if (on('eq|' + s0)) de = de.replace(/\s*=\s*/g, ' ');
       if (on('sp2|' + s0) || (on('sp1|' + s0) && !off.has('sp2|' + s0))) de = de.replace(/(\p{L})\(/gu, function (m0, a) { return a + ' ('; }).replace(/\(\s+/g, '(').replace(/\s+([.,;:)])/g, function (m0, a) { return a; });
       if (on('sp1|' + s0)) de = de.replace(/([.,;:])(?=[^\s\d)\/µ.\u0001])/g, function (m0, a) { return a + ' '; });
-      de = de.replace(/\s+/g, ' ').replace(/\u0001/g, '.').replace(/(?<![\p{L}\p{N}])trụ\s+trụ số/giu, 'trụ số').trim();
+      de = de.replace(/\s+/g, ' ').replace(/\u0001/g, '.').replace(/(?<![\p{L}\p{N}])(trụ)\s+trụ số/giu, function (m0, a) { return a + ' số'; }).trim();
       return { issues: I, de: de };
     };
   }

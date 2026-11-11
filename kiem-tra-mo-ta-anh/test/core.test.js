@@ -204,6 +204,8 @@ ok(C.validKq({ a: 5, b: { kl: 'KHỚP' }, c: { kl: 'X' } }).b && !C.validKq({ a:
   const lg = C.writeLog(plan.entries, { quan: 'Quận 1', at: '2026-11-02T09:15:00' }); ok(lg.v === 1 && lg.entries.length === 3 && lg.quan === 'Quận 1', 'nhật ký ghi có đủ thông tin');
 }
 
+eq(C.buildChecker([])('Tru số 1, Hẻm 37 Ngô Tất Tố').de, 'Trụ số 1, Hẻm 37 Ngô Tất Tố', 'viết hoa đầu câu được giữ: Tru số 1 → Trụ số 1');
+eq(C.buildChecker([])('Sơn trụ tr 7 Cô Giang').de, 'Sơn trụ số 7 Cô Giang', 'vẫn gộp trụ trụ số');
 // ---------- v1.1.2: CV bị máy chủ từ chối (cần thông tin Trụ) ----------
 { const R3 = (id, d, pole) => ({ Id: id, Description: d, StatusId: 0, CompletedQuantity: 1, CabinetId: 5, PoleId: pole, Cabinet: {} });
   const rr = [R3(11, 'Thay bóng đường Lê Duẫn', null), R3(12, 'Thay bóng đường Lê Duẫn', 900), R3(13, 'Thay bóng đường Lê Duẫn', null)];
