@@ -34,6 +34,15 @@ Mở từng link **Raw** dưới đây trong Chrome → Tampermonkey mở trang 
 
 Mở lại trang TaskListNew (Ctrl + F5) → các panel hiện ở góc phải dưới (kéo thanh tiêu đề nếu chồng nhau).
 
+### 2.1. Cập nhật bản mới
+
+![Báo có bản mới](docs/capnhat-thongbao.png)
+
+- **Tự động:** Tampermonkey tự tải bản mới từ GitHub (mặc định kiểm 1 lần/ngày). Muốn nhanh hơn: Dashboard → **Settings** → *Config mode* = **Advanced** → mục **Script Update** → *Check Interval* chọn mức ngắn nhất → **Save**.
+- **Báo trên panel (từ Liên kết sự cố v1.2.1, Báo cáo v1.0.2, Kiểm tra mô tả & ảnh v1.2.1):** mỗi lần mở trang, công cụ so phiên bản với GitHub (tối đa 30 phút/lần). Có bản mới thì panel hiện dòng vàng **"🔔 Có bản mới …"** → bấm **Cập nhật** → **Update** ở tab Tampermonkey → **Ctrl + F5**. Bấm **Để sau** thì ẩn 24 giờ.
+- **Lấy ngay:** biểu tượng Tampermonkey → **Check for userscript updates** → Ctrl + F5.
+- GitHub giữ bản cũ ~5 phút sau khi đẩy code, nên bản mới về sau vài phút.
+
 ---
 
 ## 3. Công cụ 1 — Liên kết sự cố
@@ -110,7 +119,7 @@ Công cụ **ghi nhớ cách bạn sửa** và tự áp dụng cho lần sau —
 3. Công cụ tự lấy dữ liệu 8 quận, lọc theo ngày ghi nhận, tải `BaoCao-DuyTu-KVTT-YYYYMMDD.doc`:
    bảng tổng theo quận → mỗi quận có bảng hạng mục + danh sách chi tiết → dòng ký Giám đốc CSKVTT.
 
-## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.2.0)
+## 5. Công cụ 3 — Kiểm tra mô tả & ảnh (v1.2.1)
 
 ![Bảng chính tả](docs/kiemtra-bang.png)
 
@@ -162,7 +171,7 @@ Dùng cho CV cần sửa kỹ hoặc **CV SmartHCM báo "cần cung cấp thông
 - Nếu mô tả CV đã bị người khác sửa sau lần kiểm tra, công cụ **không điền đè** mà báo để anh xem trực tiếp.
 - Chỉ có ở chế độ *Quận đang lọc*, với tài khoản quản lý đơn vị (như luật của trang).
 
-Mã nguồn có test tự động trong [`kiem-tra-mo-ta-anh/`](kiem-tra-mo-ta-anh/) (`node build.js`, rồi `node test/core.test.js`, `xlsx`, `ui`, `write`, `detail`).
+Mã nguồn có test tự động trong [`kiem-tra-mo-ta-anh/`](kiem-tra-mo-ta-anh/) (`node build.js`, rồi `node test/core.test.js`, `xlsx`, `ui`, `write`, `detail`, `upd`).
 
 ## 6. Khắc phục sự cố
 

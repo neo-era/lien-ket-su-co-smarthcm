@@ -33,13 +33,17 @@ trong repo `neo-era/lien-ket-su-co-smarthcm` (cùng 2 công cụ: Liên kết s�
    Người dùng tự chọn Trụ và bấm "Lưu dữ liệu" (`SaveMaintTaskDetail` gửi kèm PoleId) — công cụ **không tự lưu** trong luồng này.
    Chỉ chế độ Quận đang lọc, tài khoản quản lý đơn vị, CV chưa kiểm tra. Có khoá chống mở chồng; lỗi/hết giờ luôn gỡ trạng thái ẩn.
 
+11. (v1.2.1, chốt 23/11/2026) **Báo có bản mới trên panel** — `src/upd.js` (SMHUPD), dán nguyên văn vào cả 3 công cụ (test kiểm khớp):
+   tải `@updateURL` (không cookie, không referrer, chống cache) tối đa 30 phút/lần, so `@version`; bản GitHub mới hơn → dòng vàng dưới tiêu đề panel,
+   "Cập nhật" mở link .user.js cho Tampermonkey cài, "Để sau" ẩn 24 giờ (bản mới hơn nữa thì báo ngay). Lỗi mạng → im lặng. Vẫn cài qua Tampermonkey, không tự chạy code tải về.
+
 ## Kiến trúc
 - `src/core.js` (thuần, test Node): ngày, auto-check, chính tả (buildDict + check), tự học (key, learn, apply),
   hạng mục → gợi ý kiểm ảnh, tạo dữ liệu xuất.
 - `src/xlsx.js` (thuần): ghi .xlsx tối giản (zip store + CRC32, styles màu, freeze, autofilter, độ rộng cột).
 - `src/ui.js`: panel, bảng kết quả, lớp phủ xem ảnh, bảng Đã học (DOM).
 - `build.js`: ghép header + core + xlsx + ui → `kiem-tra-mo-ta-anh.user.js` (lõi chạy = lõi đã test).
-- Test: `test/core.test.js`, `test/xlsx.test.js` (mở lại bằng openpyxl), `test/ui.test.js`, `test/write.test.js`, `test/detail.test.js` (Playwright, trang giả có gridOptions + LBCS + hộp chi tiết giả).
+- Test: `test/core.test.js`, `test/xlsx.test.js` (mở lại bằng openpyxl), `test/ui.test.js`, `test/write.test.js`, `test/detail.test.js`, `test/upd.test.js` (Playwright, trang giả có gridOptions + LBCS + hộp chi tiết giả).
 
 ## Rủi ro
 - Không vào được trang thật từ môi trường dev (Claude in Chrome lỗi kết nối) → kiểm chứng giao diện bằng trang giả;

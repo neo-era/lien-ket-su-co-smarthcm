@@ -1,5 +1,5 @@
 const fs = require('fs');
-const VER = '1.2.0';
+const VER = '1.2.1';
 const RAW = 'https://raw.githubusercontent.com/neo-era/lien-ket-su-co-smarthcm/main/kiem-tra-mo-ta-anh.user.js';
 const head = `// ==UserScript==
 // @name         Kiểm tra mô tả & ảnh duy tu - SmartHCM
@@ -23,6 +23,6 @@ const head = `// ==UserScript==
  */
 `;
 const src = f => fs.readFileSync(__dirname + '/src/' + f, 'utf8').replace(/^if \(typeof module.*$/m, '');
-const out = head + '(function () {\n\'use strict\';\nvar KT_VERSION = ' + JSON.stringify(VER) + ';\n' + src('core.js') + '\n' + src('xlsx.js') + '\n' + src('ui.js') + '\n})();\n';
+const out = head + '(function () {\n\'use strict\';\nvar KT_VERSION = ' + JSON.stringify(VER) + ', KT_RAW = ' + JSON.stringify(RAW) + ';\n' + src('upd.js') + '\n' + src('core.js') + '\n' + src('xlsx.js') + '\n' + src('ui.js') + '\n})();\n';
 fs.writeFileSync(__dirname + '/../kiem-tra-mo-ta-anh.user.js', out);
 console.log('built', out.length, 'bytes v' + VER);

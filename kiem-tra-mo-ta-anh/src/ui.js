@@ -580,5 +580,6 @@
     window.open('mailto:maivulam2020@gmail.com?subject=' + encodeURIComponent('[Góp ý] Kiểm tra mô tả & ảnh v' + VER) + '&body=' + encodeURIComponent(body));
   }
 
+  try { if (typeof SMHUPD !== 'undefined' && typeof KT_RAW !== 'undefined') SMHUPD.check({ key: 'ktma', raw: KT_RAW, cur: VER, host: pn }); } catch (e) { }
   window.__ktma = { S: S, run: run, openDetail: openDetail, openWrite: openWrite, openUndo: openUndo, doWrite: doWrite, openRes: openRes, openReview: openReview, exportXlsx: exportXlsx, commit: commit, setDay: setDay, openLearn: openLearn };
 })();
